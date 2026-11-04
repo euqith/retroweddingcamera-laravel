@@ -67,24 +67,29 @@
 
             <!-- Event Duration: Starts At & Ends At (Camera Active Window) -->
             <div class="p-4 rounded-2xl bg-wedding-linen/60 border border-wedding-gold/30">
-                <div class="flex items-center space-x-2 mb-3">
-                    <span class="text-base">⏱️</span>
-                    <div>
-                        <h4 class="text-xs font-bold uppercase tracking-wider text-wedding-dark">Jadwal Durasi Acara & Kunci Kamera</h4>
-                        <p class="text-[11px] text-wedding-subtle">Kamera disposable hanya dapat digunakan memotret selama rentang waktu ini. Di luar jadwal, kamera terkunci otomatis (tamu diarahkan ke galeri).</p>
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-base">⏱️</span>
+                        <div>
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-wedding-dark">Jadwal Durasi Acara & Kunci Kamera</h4>
+                            <p class="text-[11px] text-wedding-subtle">Kamera disposable hanya dapat digunakan memotret selama rentang waktu ini (Zona Waktu: <strong>WIB / Asia/Jakarta</strong>).</p>
+                        </div>
                     </div>
+                    <span class="text-[10px] font-mono px-2 py-1 rounded bg-wedding-gold/15 text-wedding-goldHover font-bold border border-wedding-gold/30">
+                        Jam Sekarang: {{ now('Asia/Jakarta')->format('H:i') }} WIB
+                    </span>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-semibold text-wedding-dark mb-1">Waktu Mulai Acara</label>
+                        <label class="block text-xs font-semibold text-wedding-dark mb-1">Waktu Mulai Acara (WIB)</label>
                         <input type="datetime-local" name="starts_at" value="{{ old('starts_at') }}"
                                class="w-full px-3.5 py-2.5 rounded-xl border border-wedding-gold/30 focus:border-wedding-gold text-sm bg-white">
                         <span class="text-[10px] text-wedding-subtle block mt-1">Kosongkan jika ingin kamera langsung aktif kapan saja.</span>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-wedding-dark mb-1">Waktu Selesai Acara</label>
+                        <label class="block text-xs font-semibold text-wedding-dark mb-1">Waktu Selesai Acara (WIB)</label>
                         <input type="datetime-local" name="ends_at" value="{{ old('ends_at') }}"
                                class="w-full px-3.5 py-2.5 rounded-xl border border-wedding-gold/30 focus:border-wedding-gold text-sm bg-white">
                         <span class="text-[10px] text-wedding-subtle block mt-1">Setelah waktu ini, kamera otomatis ditutup & diarahkan ke galeri.</span>

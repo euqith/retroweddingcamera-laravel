@@ -60,6 +60,14 @@ class AdminController extends Controller
         $validated['is_active'] = $request->has('is_active');
         $validated['is_gallery_public'] = $request->has('is_gallery_public');
 
+        // Explicitly parse in Asia/Jakarta timezone (WIB)
+        if (!empty($validated['starts_at'])) {
+            $validated['starts_at'] = \Illuminate\Support\Carbon::parse($validated['starts_at'], 'Asia/Jakarta');
+        }
+        if (!empty($validated['ends_at'])) {
+            $validated['ends_at'] = \Illuminate\Support\Carbon::parse($validated['ends_at'], 'Asia/Jakarta');
+        }
+
         $event = Event::create($validated);
 
         return redirect()->route('admin.events.qrcodes', $event)
@@ -95,6 +103,19 @@ class AdminController extends Controller
 
         $validated['is_active'] = $request->has('is_active');
         $validated['is_gallery_public'] = $request->has('is_gallery_public');
+
+        // Explicitly parse in Asia/Jakarta timezone (WIB)
+        if (!empty($validated['starts_at'])) {
+            $validated['starts_at'] = \Illuminate\Support\Carbon::parse($validated['starts_at'], 'Asia/Jakarta');
+        } else {
+            $validated['starts_at'] = null;
+        }
+
+        if (!empty($validated['ends_at'])) {
+            $validated['ends_at'] = \Illuminate\Support\Carbon::parse($validated['ends_at'], 'Asia/Jakarta');
+        } else {
+            $validated['ends_at'] = null;
+        }
 
         $event->update($validated);
 

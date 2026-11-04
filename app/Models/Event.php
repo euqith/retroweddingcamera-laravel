@@ -124,6 +124,7 @@ class Event extends Model
 
     /**
      * Get camera access status ('open', 'upcoming', 'ended', 'inactive').
+     * Evaluated against Asia/Jakarta (WIB) timezone for accurate event scheduling.
      */
     public function cameraStatus(): string
     {
@@ -131,14 +132,21 @@ class Event extends Model
             return 'inactive';
         }
 
-        $now = now();
+        $tz = 'Asia/Jakarta';
+        $now = now($tz);
 
-        if ($this->starts_at && $now->lt($this->starts_at)) {
-            return 'upcoming';
+        if ($this->starts_at) {
+            $startsAt = $this->starts_at->copy()->timezone($tz);
+            if ($now->lt($startsAt)) {
+                return 'upcoming';
+            }
         }
 
-        if ($this->ends_at && $now->gt($this->ends_at)) {
-            return 'ended';
+        if ($this->ends_at) {
+            $endsAt = $this->ends_at->copy()->timezone($tz);
+            if ($now->gt($endsAt)) {
+                return 'ended';
+            }
         }
 
         return 'open';
