@@ -495,22 +495,9 @@ function disposableCamera(config) {
             }
         },
 
-        async toggleFlash() {
+        toggleFlash() {
+            // Only toggle the flash mode state. Do NOT turn on the hardware torch continuously.
             this.flashEnabled = !this.flashEnabled;
-
-            // Test if hardware torch is available
-            if (this.stream && this.facingMode === 'environment') {
-                const track = this.stream.getVideoTracks()[0];
-                if (track && track.getCapabilities && track.getCapabilities().torch) {
-                    try {
-                        await track.applyConstraints({
-                            advanced: [{ torch: this.flashEnabled }]
-                        });
-                    } catch (e) {
-                        console.warn('Hardware torch toggle notice:', e);
-                    }
-                }
-            }
         },
 
         triggerNativeCamera() {

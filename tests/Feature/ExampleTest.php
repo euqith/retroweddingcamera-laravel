@@ -15,16 +15,26 @@ class ExampleTest extends TestCase
      */
     public function test_the_application_returns_a_successful_response(): void
     {
-        $event = Event::create([
-            'title' => 'Sample Wedding Event',
-            'slug' => 'sample-wedding',
-            'event_type' => 'wedding',
-            'max_shots_per_device' => 36,
-            'is_active' => true,
-        ]);
-
         $response = $this->get('/');
 
-        $response->assertRedirect('/e/sample-wedding');
+        $response->assertStatus(200);
+        $response->assertSee('Retro Wedding Camera');
+        $response->assertSee('Event Organizer Portal');
+    }
+
+    public function test_login_authenticates_and_redirects_to_admin(): void
+    {
+        $user = \App\Models\User::factory()->create([
+            'email' => 'admin@retrocamera.test',
+            'password' => bcrypt('password'),
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => 'admin@retrocamera.test',
+            'password' => 'password',
+        ]);
+
+        $response->assertRedirect('/admin');
+        $this->assertAuthenticatedAs($user);
     }
 }

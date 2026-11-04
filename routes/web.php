@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EventController;
 use App\Models\Event;
 use Illuminate\Support\Facades\Route;
@@ -11,14 +12,12 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// Home page: redirect to first active event or admin
-Route::get('/', function () {
-    $firstEvent = Event::where('is_active', true)->first();
-    if ($firstEvent) {
-        return redirect()->route('event.landing', $firstEvent->slug);
-    }
-    return redirect()->route('admin.dashboard');
-})->name('home');
+// Homepage: Organizer / Admin Login Portal
+Route::get('/', [AuthController::class, 'showLogin'])->name('home');
+Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+Route::post('/login/quick', [AuthController::class, 'quickLogin'])->name('login.quick');
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Guest & Disposable Camera Routes
 Route::prefix('e/{slug}')->group(function () {

@@ -15,13 +15,26 @@
                 </div>
             </div>
 
-            <a href="{{ route('admin.events.create') }}"
-               class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-wedding-gold to-wedding-goldHover text-white text-sm font-semibold shadow hover:shadow-md transition-all">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
-                </svg>
-                <span>Buat Event Baru</span>
-            </a>
+            <div class="flex items-center space-x-2">
+                <a href="{{ route('admin.events.create') }}"
+                   class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-wedding-gold to-wedding-goldHover text-white text-sm font-semibold shadow hover:shadow-md transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                    </svg>
+                    <span>Buat Event Baru</span>
+                </a>
+
+                <form action="{{ route('logout') }}" method="POST" class="inline">
+                    @csrf
+                    <button type="submit"
+                            title="Keluar dari Admin"
+                            class="p-2.5 rounded-xl border border-wedding-gold/20 bg-white hover:bg-wedding-linen text-wedding-subtle hover:text-wedding-dark transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
+                        </svg>
+                    </button>
+                </form>
+            </div>
         </div>
 
         @if(session('success'))
