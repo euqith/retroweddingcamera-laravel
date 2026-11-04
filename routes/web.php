@@ -48,4 +48,57 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
     // Photo moderation
     Route::delete('/photos/{photo}', [AdminController::class, 'deletePhoto'])->name('photos.destroy');
+
+    // Storage link runner for shared hosting without SSH
+    Route::get('/storage-link', function () {
+        try {
+            \Illuminate\Support\Facades\Artisan::call('storage:link');
+            return response('Storage link created successfully!<br><br>' . nl2br(\Illuminate\Support\Facades\Artisan::output()));
+        } catch (\Throwable $e) {
+            return response('Storage link error: ' . $e->getMessage(), 500);
+        }
+    })->name('storage.link');
 });
+
+// Storage fallback route for shared hosting (Hostinger/cPanel) where symlinks are missing
+Route::get('/storage/{path}', function (string $path) {
+    $filePath = storage_path('app/public/' . $path);
+
+    if (file_exists($filePath)) {
+        return response()->file($filePath, [
+            'Cache-Control' => 'public, max-age=31536000',
+        ]);
+    }
+
+    // Fallback for demo photos if database was dumped from local without storage files
+    $attachmentMap = [
+        1 => 'IMG_2820.JPG',
+        2 => 'IMG_2821.JPG',
+        3 => 'IMG_2823.JPG',
+        4 => 'IMG_2825.JPG',
+        5 => 'IMG_2831.JPG',
+        6 => 'IMG_2832.JPG',
+    ];
+
+    if (preg_match('/(?:photo|shot)_(\d+)_/i', $path, $matches)) {
+        $shotNum = (int) $matches[1];
+        if (isset($attachmentMap[$shotNum])) {
+            $attachmentFile = base_path('attachment/' . $attachmentMap[$shotNum]);
+            if (file_exists($attachmentFile)) {
+                return response()->file($attachmentFile, [
+                    'Cache-Control' => 'public, max-age=31536000',
+                ]);
+            }
+        }
+    }
+
+    // Default sample fallback
+    $sample = base_path('attachment/IMG_2820.JPG');
+    if (file_exists($sample)) {
+        return response()->file($sample, [
+            'Cache-Control' => 'public, max-age=31536000',
+        ]);
+    }
+
+    abort(404);
+})->where('path', '.*')->name('storage.fallback');
