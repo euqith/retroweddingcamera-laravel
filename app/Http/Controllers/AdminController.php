@@ -147,14 +147,16 @@ class AdminController extends Controller
      */
     public function qrcodes(Event $event)
     {
+        $landingUrl = $event->landing_url;
         $cameraUrl = $event->camera_url;
         $galleryUrl = $event->gallery_url;
 
         // Generate SVG inline strings for instant crisp rendering
+        $landingQrSvg = QrCode::size(280)->margin(1)->generate($landingUrl);
         $cameraQrSvg = QrCode::size(260)->margin(1)->generate($cameraUrl);
         $galleryQrSvg = QrCode::size(260)->margin(1)->generate($galleryUrl);
 
-        return view('admin.events.qrcodes', compact('event', 'cameraUrl', 'galleryUrl', 'cameraQrSvg', 'galleryQrSvg'));
+        return view('admin.events.qrcodes', compact('event', 'landingUrl', 'cameraUrl', 'galleryUrl', 'landingQrSvg', 'cameraQrSvg', 'galleryQrSvg'));
     }
 
     /**

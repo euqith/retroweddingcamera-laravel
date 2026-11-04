@@ -106,6 +106,11 @@ class Event extends Model
         return $this->hasMany(Photo::class)->latest('taken_at');
     }
 
+    public function getLandingUrlAttribute(): string
+    {
+        return url('/e/' . $this->slug);
+    }
+
     public function getCameraUrlAttribute(): string
     {
         return url('/e/' . $this->slug . '/camera');
