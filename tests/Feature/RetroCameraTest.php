@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\CameraSession;
 use App\Models\Event;
 use App\Models\Photo;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -14,12 +15,20 @@ class RetroCameraTest extends TestCase
     use RefreshDatabase;
 
     protected Event $event;
+    protected User $adminUser;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         Storage::fake('public');
+
+        $this->adminUser = User::where('name', 'adminretro')->first()
+            ?? User::create([
+                'name' => 'adminretro',
+                'email' => 'adminretro@kurisu.id',
+                'password' => bcrypt('Adm1n456'),
+            ]);
 
         $this->event = Event::create([
             'title' => 'The Wedding of Daniel & Clara',
@@ -110,7 +119,19 @@ class RetroCameraTest extends TestCase
         ]);
     }
 
-    public function test_device_roll_can_be_reset(): void
+    public function test_unauthenticated_user_cannot_access_admin_dashboard_or_endpoints(): void
+    {
+        $response = $this->get('/admin');
+        $response->assertRedirect('/login');
+
+        $responseCreate = $this->get('/admin/events/create');
+        $responseCreate->assertRedirect('/login');
+
+        $responseDelete = $this->delete("/admin/events/{$this->event->id}");
+        $responseDelete->assertRedirect('/login');
+    }
+
+    public function test_guest_cannot_reset_roll_from_camera_and_only_admin_can_reset_session(): void
     {
         $session = CameraSession::create([
             'event_id' => $this->event->id,
@@ -119,16 +140,19 @@ class RetroCameraTest extends TestCase
             'max_shots' => 36,
         ]);
 
-        $response = $this->postJson('/e/daniel-clara/session/reset', [], [
+        // 1. Guest public endpoint is removed and returns 404
+        $guestResponse = $this->postJson('/e/daniel-clara/session/reset', [], [
             'X-Device-Token' => 'RESET-TEST-DEVICE',
         ]);
+        $guestResponse->assertStatus(404);
 
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => true,
-            'shots_taken' => 0,
-            'remaining' => 36,
-        ]);
+        // 2. Unauthenticated request to admin session reset redirects to login
+        $unauthAdminResponse = $this->post("/admin/sessions/{$session->id}/reset");
+        $unauthAdminResponse->assertRedirect('/login');
+
+        // 3. Authenticated Admin can safely reset session roll
+        $adminResponse = $this->actingAs($this->adminUser)->post("/admin/sessions/{$session->id}/reset");
+        $adminResponse->assertRedirect();
 
         $this->assertDatabaseHas('camera_sessions', [
             'id' => $session->id,
@@ -146,7 +170,7 @@ class RetroCameraTest extends TestCase
 
     public function test_admin_can_access_qrcodes(): void
     {
-        $response = $this->get("/admin/events/{$this->event->id}/qrcodes");
+        $response = $this->actingAs($this->adminUser)->get("/admin/events/{$this->event->id}/qrcodes");
         $response->assertStatus(200);
         $response->assertSee('Buka Kamera Disposable');
         $response->assertSee('Buka Galeri Foto');
@@ -186,8 +210,8 @@ class RetroCameraTest extends TestCase
         $photo = Photo::first();
         Storage::disk('public')->assertExists($photo->file_path);
 
-        // Delete the event
-        $response = $this->delete("/admin/events/{$this->event->id}");
+        // Delete the event as authenticated admin
+        $response = $this->actingAs($this->adminUser)->delete("/admin/events/{$this->event->id}");
         $response->assertRedirect('/admin');
 
         // Verify folder and files on disk are removed
@@ -214,8 +238,8 @@ class RetroCameraTest extends TestCase
         $this->assertNotNull($photo);
         Storage::disk('public')->assertExists($photo->file_path);
 
-        // Delete photo
-        $response = $this->delete("/admin/photos/{$photo->id}");
+        // Delete photo as authenticated admin
+        $response = $this->actingAs($this->adminUser)->delete("/admin/photos/{$photo->id}");
         $response->assertRedirect();
 
         $this->assertDatabaseMissing('photos', ['id' => $photo->id]);
@@ -237,8 +261,8 @@ class RetroCameraTest extends TestCase
 
         $this->assertDatabaseCount('photos', 1);
 
-        // Clear all photos
-        $response = $this->post("/admin/events/{$this->event->id}/gallery/clear");
+        // Clear all photos as authenticated admin
+        $response = $this->actingAs($this->adminUser)->post("/admin/events/{$this->event->id}/gallery/clear");
         $response->assertRedirect();
 
         $this->assertDatabaseCount('photos', 0);

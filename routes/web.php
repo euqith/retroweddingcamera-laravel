@@ -16,29 +16,27 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [AuthController::class, 'showLogin'])->name('home');
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
-Route::post('/login/quick', [AuthController::class, 'quickLogin'])->name('login.quick');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Direct Photo Streaming Routes (Immune to symlink & hostinger permission issues)
 Route::get('/photos/view/{photo}', [EventController::class, 'viewPhoto'])->name('photo.view');
 Route::get('/photos/thumb/{photo}', [EventController::class, 'viewThumbnail'])->name('photo.thumbnail');
 
-// Root shortcut to repair storage link
+// Root shortcut to repair storage link (Requires Admin Authentication)
 Route::get('/storage-link', function () {
     return redirect()->route('admin.storage.link');
-});
+})->middleware('auth');
 
 // Guest & Disposable Camera Routes
 Route::prefix('e/{slug}')->group(function () {
     Route::get('/', [EventController::class, 'landing'])->name('event.landing');
     Route::get('/camera', [EventController::class, 'camera'])->name('event.camera');
-    Route::post('/camera/capture', [EventController::class, 'capture'])->name('event.camera.capture');
+    Route::post('/camera/capture', [EventController::class, 'capture'])->name('event.camera.capture')->middleware('throttle:30,1');
     Route::get('/gallery', [EventController::class, 'gallery'])->name('event.gallery');
-    Route::post('/session/reset', [EventController::class, 'resetSession'])->name('event.session.reset');
 });
 
-// Admin & Organizer Routes
-Route::prefix('admin')->name('admin.')->group(function () {
+// Admin & Organizer Routes (Strictly Authenticated)
+Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
     Route::get('/', [AdminController::class, 'index'])->name('dashboard');
     Route::get('/events/create', [AdminController::class, 'create'])->name('events.create');
     Route::post('/events', [AdminController::class, 'store'])->name('events.store');

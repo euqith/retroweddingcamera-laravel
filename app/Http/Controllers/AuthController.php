@@ -6,6 +6,8 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -22,7 +24,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Handle login authentication by username or email
+     * Handle login authentication by username or email with rate limiting
      */
     public function login(Request $request)
     {
@@ -31,40 +33,33 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
+        $throttleKey = Str::transliterate(Str::lower($request->input('login')) . '|' . $request->ip());
+
+        // Max 5 failed attempts per minute
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            return back()->withErrors([
+                'login' => "Terlalu banyak percobaan masuk yang salah. Silakan coba kembali dalam {$seconds} detik.",
+            ])->onlyInput('login');
+        }
+
         $login = $request->input('login');
         $password = $request->input('password');
 
         $user = User::where('name', $login)->orWhere('email', $login)->first();
 
         if ($user && Hash::check($password, $user->password)) {
+            RateLimiter::clear($throttleKey);
             Auth::login($user, $request->boolean('remember'));
             $request->session()->regenerate();
             return redirect()->intended(route('admin.dashboard'));
         }
 
+        RateLimiter::hit($throttleKey, 60);
+
         return back()->withErrors([
             'login' => 'Username/email atau password yang Anda masukkan tidak sesuai.',
         ])->onlyInput('login');
-    }
-
-    /**
-     * Quick 1-Click Login for Organizer testing
-     */
-    public function quickLogin(Request $request)
-    {
-        $user = User::where('name', 'adminretro')->first() ?? User::first();
-        if (!$user) {
-            $user = User::create([
-                'name' => 'adminretro',
-                'email' => 'adminretro@kurisu.id',
-                'password' => Hash::make('Adm1n456'),
-            ]);
-        }
-
-        Auth::login($user, true);
-        $request->session()->regenerate();
-
-        return redirect()->route('admin.dashboard')->with('success', 'Selamat datang di Dashboard Admin Event!');
     }
 
     /**

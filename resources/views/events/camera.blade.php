@@ -9,7 +9,6 @@
         eventTitle: '{{ addslashes($event->title) }}',
         filterPreset: '{{ $event->filter_preset }}',
         captureUrl: '{{ route('event.camera.capture', $event->slug) }}',
-        resetUrl: '{{ route('event.session.reset', $event->slug) }}',
         galleryUrl: '{{ route('event.gallery', $event->slug) }}',
         landingUrl: '{{ route('event.landing', $event->slug) }}',
         initialMyPhotos: {{ json_encode($myPhotos) }}
@@ -169,9 +168,6 @@
                             class="w-full py-2.5 px-4 bg-gradient-to-r from-wedding-gold to-wedding-goldHover text-white rounded-xl text-xs font-semibold shadow">
                         Lihat Roll Foto Saya
                     </button>
-                    <button @click="resetRoll()" type="button" class="mt-2 text-[11px] text-white/50 hover:text-white underline">
-                        Reset Roll (Khusus Testing Dev)
-                    </button>
                 </div>
 
                 <!-- Processing Spinner -->
@@ -284,21 +280,11 @@
         </div>
     </div>
 
-    <!-- Bottom Info & Dev Reset -->
-    <footer class="w-full max-w-md pb-6 px-4 flex flex-col items-center text-center z-20 space-y-2">
+    <!-- Bottom Info -->
+    <footer class="w-full max-w-md pb-6 px-4 flex flex-col items-center text-center z-20 space-y-1">
         <p class="text-xs text-white/60 font-mono">
             Tersisa: <span class="text-wedding-filmOrange font-bold" x-text="remainingShots"></span> / <span x-text="maxShots"></span> Foto
         </p>
-
-        <!-- Dev Reset Button (Testing Mode) -->
-        <button @click="resetRoll()"
-                type="button"
-                class="inline-flex items-center space-x-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 text-white/70 hover:text-white rounded-full text-[11px] transition-colors border border-white/10">
-            <svg class="w-3.5 h-3.5 text-wedding-gold" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
-            </svg>
-            <span>[Dev] Reset Roll (0/36)</span>
-        </button>
     </footer>
 
     <!-- PRIVATE "ROLL SAYA" SLIDE-OVER DRAWER -->
@@ -479,7 +465,6 @@ function disposableCamera(config) {
         shotsTaken: config.initialShots,
         maxShots: config.maxShots,
         captureUrl: config.captureUrl,
-        resetUrl: config.resetUrl,
         galleryUrl: config.galleryUrl,
         landingUrl: config.landingUrl,
         myPhotos: config.initialMyPhotos || [],
@@ -1073,32 +1058,6 @@ function disposableCamera(config) {
             ctx.fillStyle = dateColor;
             ctx.fillText(dateStr, width - (fontSize * 1.2), height - (fontSize * 1.2));
             ctx.restore();
-        },
-
-        async resetRoll() {
-            if (!confirm('Reset jatah roll kamera perangkat ini kembali ke 0/36?')) return;
-
-            try {
-                const response = await fetch(this.resetUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': this.csrf,
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ clear_photos: false })
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    this.shotsTaken = 0;
-                    this.myPhotos = [];
-                    alert('Roll kamera berhasil di-reset ke 0/36! Anda dapat memotret kembali.');
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Gagal me-reset roll kamera.');
-            }
         }
     };
 }

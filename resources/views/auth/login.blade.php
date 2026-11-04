@@ -50,11 +50,11 @@
                     <input type="text"
                            id="login"
                            name="login"
-                           value="{{ old('login', 'adminretro') }}"
+                           value="{{ old('login') }}"
                            required
                            autofocus
                            class="w-full px-4 py-3 rounded-xl border border-wedding-gold/40 bg-wedding-ivory/40 text-wedding-dark text-sm focus:outline-none focus:ring-2 focus:ring-wedding-gold/50 focus:border-wedding-gold transition-all"
-                           placeholder="adminretro">
+                           placeholder="Masukkan username atau email">
                 </div>
 
                 <div>
@@ -66,8 +66,9 @@
                     <input type="password"
                            id="password"
                            name="password"
-                           value="Adm1n456"
+                           value=""
                            required
+                           placeholder="••••••••"
                            class="w-full px-4 py-3 rounded-xl border border-wedding-gold/40 bg-wedding-ivory/40 text-wedding-dark text-sm focus:outline-none focus:ring-2 focus:ring-wedding-gold/50 focus:border-wedding-gold transition-all">
                 </div>
 
@@ -75,7 +76,6 @@
                     <label class="flex items-center text-xs text-wedding-dark cursor-pointer">
                         <input type="checkbox"
                                name="remember"
-                               checked
                                class="rounded border-wedding-gold/40 text-wedding-gold focus:ring-wedding-gold">
                         <span class="ml-2">Ingat saya</span>
                     </label>
@@ -91,20 +91,6 @@
                     </button>
                 </div>
             </form>
-
-            <!-- 1-Click Fast Login Button -->
-            <div class="mt-6 pt-5 border-t border-wedding-gold/20 text-center">
-                <form action="{{ route('login.quick') }}" method="POST">
-                    @csrf
-                    <button type="submit"
-                            class="w-full py-2.5 px-4 rounded-xl border border-wedding-gold/40 bg-wedding-linen hover:bg-wedding-gold/10 text-wedding-dark text-xs font-semibold transition-colors flex items-center justify-center space-x-2">
-                        <svg class="w-4 h-4 text-wedding-gold" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-                        </svg>
-                        <span>1-Klik Masuk Otomatis (Demo/Admin)</span>
-                    </button>
-                </form>
-            </div>
         </div>
 
         <!-- Direct links to public events if available -->

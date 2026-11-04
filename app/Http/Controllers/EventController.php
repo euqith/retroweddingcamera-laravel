@@ -24,9 +24,13 @@ class EventController extends Controller
             ?? $request->input('device_token')
             ?? $request->cookie('retro_device_token');
 
+        if ($token) {
+            $token = preg_replace('/[^a-zA-Z0-9_\-]/', '', substr((string) $token, 0, 64));
+        }
+
         if (!$token) {
-            $token = 'DEV-' . strtoupper(Str::random(12));
-            Cookie::queue('retro_device_token', $token, 60 * 24 * 30); // 30 days
+            $token = 'DEV-' . strtoupper(Str::random(16));
+            Cookie::queue(Cookie::make('retro_device_token', $token, 60 * 24 * 30, '/', null, $request->isSecure(), true, false, 'lax'));
         }
 
         return $token;
@@ -112,10 +116,10 @@ class EventController extends Controller
         }
 
         $request->validate([
-            'image' => 'required|string',
+            'image' => ['required', 'string', 'starts_with:data:image/'],
             'camera_facing' => 'nullable|string|in:environment,user',
             'flash_enabled' => 'nullable|boolean',
-            'filter_applied' => 'nullable|string|max:50',
+            'filter_applied' => 'nullable|string|in:fuji_quicksnap,kodak_funsaver,warm_portra,ilford_bw,cinestill_800t,agfa_vista,lomography_color',
             'caption' => 'nullable|string|max:255',
         ]);
 
@@ -190,27 +194,6 @@ class EventController extends Controller
         $guestCount = $event->cameraSessions()->count();
 
         return view('events.gallery', compact('event', 'session', 'photos', 'filter', 'totalPhotos', 'guestCount', 'deviceToken'));
-    }
-
-    /**
-     * Quick Reset Session Roll (For testing / dev)
-     */
-    public function resetSession(string $slug, Request $request): JsonResponse
-    {
-        $event = Event::where('slug', $slug)->firstOrFail();
-        $deviceToken = $this->getDeviceToken($request);
-        $session = $this->getCameraSession($event, $deviceToken, $request);
-
-        $clearPhotos = (bool) $request->input('clear_photos', false);
-        $session->resetRoll($clearPhotos);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Roll kamera berhasil di-reset kembali ke 0/36!',
-            'shots_taken' => $session->shots_taken,
-            'max_shots' => $session->max_shots,
-            'remaining' => $session->remaining_shots,
-        ]);
     }
 
     /**

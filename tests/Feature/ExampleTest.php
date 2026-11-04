@@ -35,4 +35,30 @@ class ExampleTest extends TestCase
         $response->assertRedirect('/admin');
         $this->assertAuthenticatedAs($user);
     }
+
+    public function test_quick_login_is_disabled_in_production(): void
+    {
+        $response = $this->post('/login/quick');
+        $response->assertStatus(404);
+    }
+
+    public function test_login_rate_limiting_protects_against_brute_force(): void
+    {
+        // 5 wrong attempts
+        for ($i = 0; $i < 5; $i++) {
+            $this->post('/login', [
+                'login' => 'adminretro',
+                'password' => 'WrongPassword!',
+            ]);
+        }
+
+        // 6th attempt should be blocked by RateLimiter
+        $response = $this->post('/login', [
+            'login' => 'adminretro',
+            'password' => 'WrongPassword!',
+        ]);
+
+        $response->assertSessionHasErrors('login');
+        $this->assertStringContainsString('Terlalu banyak percobaan', session('errors')->first('login'));
+    }
 }
