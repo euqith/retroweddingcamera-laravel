@@ -269,5 +269,65 @@ class RetroCameraTest extends TestCase
         $thumbResponse = $this->get($photo->thumbnail_url);
         $thumbResponse->assertStatus(200);
     }
+
+    public function test_film_simulation_is_device_specific_and_does_not_change_event_default(): void
+    {
+        $dummyBase64 = 'data:image/png;base64,' . base64_encode(
+            imagepng(imagecreatetruecolor(50, 50)) ? ob_get_clean() : ''
+        );
+
+        // Assert event starts with 'fuji_quicksnap' default
+        $this->assertEquals('fuji_quicksnap', $this->event->filter_preset);
+
+        // Device A captures photo with 'ilford_bw' simulation
+        $resA = $this->postJson('/e/daniel-clara/camera/capture', [
+            'image' => $dummyBase64,
+            'filter_applied' => 'ilford_bw',
+        ], [
+            'X-Device-Token' => 'DEVICE-A-ILFORD',
+        ]);
+        $resA->assertStatus(200);
+
+        // Check Device A's photo got 'ilford_bw'
+        $photoA = Photo::find($resA->json('photo.id'));
+        $this->assertNotNull($photoA);
+        $this->assertEquals('ilford_bw', $photoA->filter_applied);
+
+        // Confirm Event's default in database was NOT changed!
+        $this->event->refresh();
+        $this->assertEquals('fuji_quicksnap', $this->event->filter_preset);
+
+        // Device B captures photo with 'kodak_funsaver'
+        $resB = $this->postJson('/e/daniel-clara/camera/capture', [
+            'image' => $dummyBase64,
+            'filter_applied' => 'kodak_funsaver',
+        ], [
+            'X-Device-Token' => 'DEVICE-B-KODAK',
+        ]);
+        $resB->assertStatus(200);
+
+        // Check Device B's photo got 'kodak_funsaver'
+        $photoB = Photo::find($resB->json('photo.id'));
+        $this->assertNotNull($photoB);
+        $this->assertEquals('kodak_funsaver', $photoB->filter_applied);
+
+        // Confirm Event's default STILL remains 'fuji_quicksnap'
+        $this->event->refresh();
+        $this->assertEquals('fuji_quicksnap', $this->event->filter_preset);
+
+        // Device C captures without specifying filter_applied (falls back to event default)
+        $resC = $this->postJson('/e/daniel-clara/camera/capture', [
+            'image' => $dummyBase64,
+        ], [
+            'X-Device-Token' => 'DEVICE-C-DEFAULT',
+        ]);
+        $resC->assertStatus(200);
+
+        $photoC = Photo::find($resC->json('photo.id'));
+        $this->assertNotNull($photoC);
+        $this->assertEquals('fuji_quicksnap', $photoC->filter_applied);
+        $this->event->refresh();
+        $this->assertEquals('fuji_quicksnap', $this->event->filter_preset);
+    }
 }
 

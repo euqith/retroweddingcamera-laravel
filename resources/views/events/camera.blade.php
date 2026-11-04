@@ -434,6 +434,7 @@
                             <div class="flex items-center space-x-2 mb-1">
                                 <span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-[#231F1E] text-wedding-gold" x-text="preset.badge"></span>
                                 <span class="font-serif text-sm font-bold text-wedding-dark" x-text="preset.name"></span>
+                                <span x-show="preset.id === defaultPreset" class="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold border border-amber-300">Default Acara</span>
                             </div>
                             <span class="text-[11px] text-wedding-olive font-semibold block" x-text="preset.tag"></span>
                             <span class="text-[10px] text-wedding-subtle block mt-0.5 leading-snug" x-text="preset.desc"></span>
@@ -448,8 +449,14 @@
 
             <div class="pt-3 border-t border-wedding-gold/20 text-center mt-3">
                 <p class="text-[10px] text-wedding-subtle">
-                    Setiap foto akan diproses dengan karakter kurva tone, saturasi warna, dan grain dari roll film yang dipilih.
+                    Setiap foto akan diproses dengan karakter kurva tone, saturasi warna, dan grain dari roll film yang dipilih. Pilihan ini hanya berlaku untuk perangkat ini.
                 </p>
+                <button x-show="currentPreset !== defaultPreset"
+                        @click="setFilm(defaultPreset); showFilmModal = false;"
+                        type="button"
+                        class="mt-2 text-[11px] text-wedding-gold hover:text-wedding-goldHover underline font-semibold block mx-auto">
+                    🔄 Kembalikan ke Preset Default Acara
+                </button>
             </div>
         </div>
     </div>
@@ -472,6 +479,7 @@ function disposableCamera(config) {
         showMyGallery: false,
         previewPhoto: null,
         showFilmModal: false,
+        defaultPreset: config.filterPreset || 'fuji_quicksnap',
         currentPreset: (function() {
             try {
                 return localStorage.getItem('retro_film_' + config.slug) || config.filterPreset || 'fuji_quicksnap';

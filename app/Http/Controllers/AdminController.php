@@ -45,7 +45,7 @@ class AdminController extends Controller
             'location' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'theme_preset' => 'required|string|in:ivory_gold,sacred_olive,classic_film',
-            'filter_preset' => 'required|string|in:fuji_quicksnap,kodak_funsaver,warm_portra',
+            'filter_preset' => 'required|string|in:fuji_quicksnap,kodak_funsaver,warm_portra,ilford_bw,cinestill_800t,agfa_vista,lomography_color',
             'max_shots_per_device' => 'required|integer|min:1|max:100',
             'is_active' => 'nullable|boolean',
             'is_gallery_public' => 'nullable|boolean',
@@ -85,7 +85,7 @@ class AdminController extends Controller
             'location' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'theme_preset' => 'required|string|in:ivory_gold,sacred_olive,classic_film',
-            'filter_preset' => 'required|string|in:fuji_quicksnap,kodak_funsaver,warm_portra',
+            'filter_preset' => 'required|string|in:fuji_quicksnap,kodak_funsaver,warm_portra,ilford_bw,cinestill_800t,agfa_vista,lomography_color',
             'max_shots_per_device' => 'required|integer|min:1|max:100',
         ]);
 
