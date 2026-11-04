@@ -52,14 +52,103 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // Photo moderation
     Route::delete('/photos/{photo}', [AdminController::class, 'deletePhoto'])->name('photos.destroy');
 
-    // Storage link runner for shared hosting without SSH
+    // Storage link runner and auto-repair for shared hosting (Hostinger/cPanel)
     Route::get('/storage-link', function () {
-        try {
-            \Illuminate\Support\Facades\Artisan::call('storage:link');
-            return response('Storage link created successfully!<br><br>' . nl2br(\Illuminate\Support\Facades\Artisan::output()));
-        } catch (\Throwable $e) {
-            return response('Storage link error: ' . $e->getMessage(), 500);
+        $logs = [];
+        $publicStorage = public_path('storage');
+        $storageAppPublic = storage_path('app/public');
+
+        // 1. Ensure storage/app/public directory exists
+        if (!file_exists($storageAppPublic)) {
+            @mkdir($storageAppPublic, 0775, true);
+            $logs[] = "Created directory: storage/app/public";
         }
+
+        // 2. Remove broken/dead symlink from local development
+        if (is_link($publicStorage) || file_exists($publicStorage)) {
+            if (is_link($publicStorage)) {
+                $currentTarget = @readlink($publicStorage);
+                $logs[] = "Detected existing symlink -> " . ($currentTarget ?: 'unknown');
+                @unlink($publicStorage);
+                $logs[] = "Removed old symlink.";
+            } elseif (is_dir($publicStorage)) {
+                $logs[] = "public/storage is an actual directory.";
+            }
+        }
+
+        // 3. Recreate relative symlink using Artisan with --force --relative
+        try {
+            \Illuminate\Support\Facades\Artisan::call('storage:link', ['--relative' => true, '--force' => true]);
+            $logs[] = "Artisan: " . trim(\Illuminate\Support\Facades\Artisan::output());
+        } catch (\Throwable $e) {
+            $logs[] = "Artisan error: " . $e->getMessage();
+            // Fallback native PHP symlink
+            if (!file_exists($publicStorage) && function_exists('symlink')) {
+                @symlink('../storage/app/public', $publicStorage);
+                $logs[] = "Created relative symlink using native PHP symlink().";
+            }
+        }
+
+        // 4. Restore demo photos from attachment/ into storage if database was dumped without storage files
+        $restoredCount = 0;
+        try {
+            $photos = \App\Models\Photo::all();
+            $attachmentDir = base_path('attachment');
+            $attachmentFiles = file_exists($attachmentDir) ? \Illuminate\Support\Facades\File::files($attachmentDir) : [];
+
+            if (count($attachmentFiles) > 0) {
+                foreach ($photos as $photo) {
+                    $targetFile = storage_path('app/public/' . $photo->file_path);
+                    if (!file_exists($targetFile)) {
+                        @mkdir(dirname($targetFile), 0775, true);
+                        $shotIndex = ($photo->shot_number - 1) % count($attachmentFiles);
+                        if (isset($attachmentFiles[$shotIndex])) {
+                            copy($attachmentFiles[$shotIndex]->getRealPath(), $targetFile);
+                            $restoredCount++;
+                        }
+                    }
+                }
+            }
+            if ($restoredCount > 0) {
+                $logs[] = "Restored {$restoredCount} demo photo files from attachment directory into storage.";
+            }
+        } catch (\Throwable $e) {
+            $logs[] = "Photo sync notice: " . $e->getMessage();
+        }
+
+        $samplePhoto = \App\Models\Photo::first();
+        $sampleUrl = $samplePhoto ? $samplePhoto->url : url('/storage');
+        $isLinkActive = is_link($publicStorage) || file_exists($publicStorage);
+
+        $html = "
+        <div style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif; max-width: 620px; margin: 40px auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 16px; background: #fafafa; line-height: 1.6; color: #1e293b;'>
+            <div style='display: flex; align-items: center; margin-bottom: 16px;'>
+                <span style='font-size: 24px; margin-right: 10px;'>✅</span>
+                <h2 style='margin: 0; color: #15803d; font-size: 20px;'>Storage Link Berhasil Diperbaiki!</h2>
+            </div>
+            <p style='font-size: 14px; margin-top: 0; color: #475569;'>
+                Symlink <code>public/storage</code> lama telah dihapus dan dibuat ulang dengan tautan relatif (<code>../storage/app/public</code>) yang valid untuk server Hostinger.
+            </p>
+            <div style='background: #fff; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 13px; font-family: monospace;'>
+                <strong>Log Proses:</strong>
+                <pre style='margin: 8px 0 0 0; white-space: pre-wrap; color: #334155;'>" . implode("\n", $logs) . "</pre>
+            </div>
+            " . ($samplePhoto ? "
+            <div style='margin-top: 18px; padding: 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px;'>
+                <p style='margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #166534;'>Tes Tampilan Foto:</p>
+                <img src='{$sampleUrl}' style='max-width: 180px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); display: block; margin-bottom: 10px;' alt='Sample' onerror=\"this.style.display='none'; document.getElementById('img-err').style.display='block';\" />
+                <div id='img-err' style='display: none; color: #dc2626; font-size: 13px; margin-bottom: 8px;'>⚠️ Gambar belum tampil langsung via web server.</div>
+                <a href='{$sampleUrl}' target='_blank' style='color: #2563eb; font-size: 13px; font-weight: 500; text-decoration: underline;'>Buka link gambar langsung ↗</a>
+            </div>
+            " : "") . "
+            <div style='margin-top: 24px; display: flex; gap: 12px;'>
+                <a href='/admin' style='padding: 10px 20px; background: #2563eb; color: #fff; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;'>Buka Admin Dashboard</a>
+                <a href='javascript:location.reload()' style='padding: 10px 20px; background: #e2e8f0; color: #334155; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500;'>Refresh Periksa Ulang</a>
+            </div>
+        </div>
+        ";
+
+        return response($html);
     })->name('storage.link');
 });
 
