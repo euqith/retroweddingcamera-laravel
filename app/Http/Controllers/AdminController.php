@@ -42,6 +42,8 @@ class AdminController extends Controller
             'slug' => 'nullable|string|max:255|unique:events,slug',
             'event_type' => 'required|string|in:wedding,church,general',
             'event_date' => 'nullable|date',
+            'starts_at' => 'nullable|date',
+            'ends_at' => 'nullable|date|after_or_equal:starts_at',
             'location' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'theme_preset' => 'required|string|in:ivory_gold,sacred_olive,classic_film',
@@ -82,6 +84,8 @@ class AdminController extends Controller
             'slug' => 'required|string|max:255|unique:events,slug,' . $event->id,
             'event_type' => 'required|string|in:wedding,church,general',
             'event_date' => 'nullable|date',
+            'starts_at' => 'nullable|date',
+            'ends_at' => 'nullable|date|after_or_equal:starts_at',
             'location' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'theme_preset' => 'required|string|in:ivory_gold,sacred_olive,classic_film',
@@ -138,38 +142,13 @@ class AdminController extends Controller
     }
 
     /**
-     * Device Sessions & Roll Reset Manager
+     * Device Sessions Monitor (Read-Only)
      */
     public function sessions(Event $event)
     {
         $sessions = $event->cameraSessions()->withCount('photos')->latest('updated_at')->paginate(20);
 
         return view('admin.events.sessions', compact('event', 'sessions'));
-    }
-
-    /**
-     * Reset a single device's roll
-     */
-    public function resetSession(CameraSession $session, Request $request)
-    {
-        $clearPhotos = (bool) $request->input('clear_photos', false);
-        $session->resetRoll($clearPhotos);
-
-        return back()->with('success', "Roll kamera untuk perangkat {$session->device_token} berhasil di-reset ke 0/36!");
-    }
-
-    /**
-     * Reset all devices for an event
-     */
-    public function resetAllSessions(Event $event, Request $request)
-    {
-        $clearPhotos = (bool) $request->input('clear_photos', false);
-
-        foreach ($event->cameraSessions as $session) {
-            $session->resetRoll($clearPhotos);
-        }
-
-        return back()->with('success', "Seluruh roll kamera perangkat pada event '{$event->title}' berhasil di-reset ke 0/36!");
     }
 
     /**

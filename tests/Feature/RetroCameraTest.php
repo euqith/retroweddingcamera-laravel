@@ -151,7 +151,7 @@ class RetroCameraTest extends TestCase
         $responseDelete->assertRedirect('/login');
     }
 
-    public function test_guest_cannot_reset_roll_from_camera_and_only_admin_can_reset_session(): void
+    public function test_roll_reset_is_completely_removed_for_production(): void
     {
         $session = CameraSession::create([
             'event_id' => $this->event->id,
@@ -160,25 +160,107 @@ class RetroCameraTest extends TestCase
             'max_shots' => 36,
         ]);
 
-        // 1. Guest public endpoint is removed and returns 404
+        // 1. Guest public endpoint is removed (404)
         $guestResponse = $this->postJson('/e/daniel-clara/session/reset', [], [
             'X-Device-Token' => 'RESET-TEST-DEVICE',
         ]);
         $guestResponse->assertStatus(404);
 
-        // 2. Unauthenticated request to admin session reset redirects to login
-        $unauthAdminResponse = $this->post("/admin/sessions/{$session->id}/reset");
-        $unauthAdminResponse->assertRedirect('/login');
-
-        // 3. Authenticated Admin can safely reset session roll
+        // 2. Admin reset endpoint is also completely removed for production (404)
         $adminResponse = $this->actingAs($this->adminUser)->post("/admin/sessions/{$session->id}/reset");
-        $adminResponse->assertRedirect();
+        $adminResponse->assertStatus(404);
 
+        // Roll remains at 36 (no accidental reset possible)
         $this->assertDatabaseHas('camera_sessions', [
             'id' => $session->id,
-            'shots_taken' => 0,
-            'reset_count' => 1,
+            'shots_taken' => 36,
         ]);
+    }
+
+    public function test_camera_is_blocked_when_event_has_not_started_yet(): void
+    {
+        // Event starts tomorrow
+        $upcomingEvent = Event::create([
+            'title' => 'Upcoming Wedding',
+            'slug' => 'upcoming-wedding',
+            'event_type' => 'wedding',
+            'starts_at' => now()->addDay(),
+            'ends_at' => now()->addDays(2),
+            'theme_preset' => 'sacred_olive',
+            'filter_preset' => 'lomography_color',
+            'max_shots_per_device' => 36,
+            'is_active' => true,
+        ]);
+
+        $this->assertEquals('upcoming', $upcomingEvent->cameraStatus());
+        $this->assertFalse($upcomingEvent->isCameraOpen());
+
+        // Camera page shows locked gate
+        $response = $this->get('/e/upcoming-wedding/camera');
+        $response->assertStatus(200);
+        $response->assertSee('Kamera Belum Dibuka');
+        $response->assertSee('Buka Galeri Foto Bersama Tamu');
+
+        // Capture attempt is blocked (403)
+        $captureResponse = $this->postJson('/e/upcoming-wedding/camera/capture', [
+            'image' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        ]);
+        $captureResponse->assertStatus(403);
+        $captureResponse->assertJson(['success' => false]);
+    }
+
+    public function test_camera_is_blocked_when_event_has_ended_but_gallery_remains_accessible(): void
+    {
+        // Event ended yesterday
+        $endedEvent = Event::create([
+            'title' => 'Past Wedding',
+            'slug' => 'past-wedding',
+            'event_type' => 'wedding',
+            'starts_at' => now()->subDays(2),
+            'ends_at' => now()->subDay(),
+            'theme_preset' => 'classic_film',
+            'filter_preset' => 'fuji_quicksnap',
+            'max_shots_per_device' => 36,
+            'is_active' => true,
+        ]);
+
+        $this->assertEquals('ended', $endedEvent->cameraStatus());
+        $this->assertFalse($endedEvent->isCameraOpen());
+
+        // Camera page shows closed gate
+        $cameraResponse = $this->get('/e/past-wedding/camera');
+        $cameraResponse->assertStatus(200);
+        $cameraResponse->assertSee('Periode Foto Telah Selesai');
+        $cameraResponse->assertSee('Buka Galeri Foto Bersama Tamu');
+
+        // Capture attempt is blocked (403)
+        $captureResponse = $this->postJson('/e/past-wedding/camera/capture', [
+            'image' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        ]);
+        $captureResponse->assertStatus(403);
+        $captureResponse->assertJson(['success' => false]);
+
+        // Gallery remains 100% accessible!
+        $galleryResponse = $this->get('/e/past-wedding/gallery');
+        $galleryResponse->assertStatus(200);
+        $galleryResponse->assertSee('Public Event Gallery');
+    }
+
+    public function test_event_theme_presets_render_distinct_styles(): void
+    {
+        $oliveEvent = new Event(['theme_preset' => 'sacred_olive']);
+        $oliveStyles = $oliveEvent->getThemeStyles();
+        $this->assertEquals('bg-[#273529]', $oliveStyles['body_bg']);
+        $this->assertStringContainsString('Sacred Church', $oliveStyles['tag']);
+
+        $classicEvent = new Event(['theme_preset' => 'classic_film']);
+        $classicStyles = $classicEvent->getThemeStyles();
+        $this->assertEquals('bg-[#E5A93C]', $classicStyles['body_bg']);
+        $this->assertStringContainsString('Vintage 35mm', $classicStyles['tag']);
+
+        $ivoryEvent = new Event(['theme_preset' => 'ivory_gold']);
+        $ivoryStyles = $ivoryEvent->getThemeStyles();
+        $this->assertEquals('bg-[#FAF6F0]', $ivoryStyles['body_bg']);
     }
 
     public function test_guest_can_view_gallery(): void

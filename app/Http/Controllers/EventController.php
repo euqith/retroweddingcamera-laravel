@@ -82,6 +82,7 @@ class EventController extends Controller
         $event = Event::where('slug', $slug)->where('is_active', true)->firstOrFail();
         $deviceToken = $this->getDeviceToken($request);
         $session = $this->getCameraSession($event, $deviceToken, $request);
+        $cameraStatus = $event->cameraStatus(); // 'open', 'upcoming', 'ended'
 
         $myPhotos = $session->photos()->orderBy('shot_number', 'desc')->get()->map(function ($p) {
             return [
@@ -93,7 +94,7 @@ class EventController extends Controller
             ];
         });
 
-        return view('events.camera', compact('event', 'session', 'deviceToken', 'myPhotos'));
+        return view('events.camera', compact('event', 'session', 'deviceToken', 'myPhotos', 'cameraStatus'));
     }
 
     /**
@@ -104,6 +105,20 @@ class EventController extends Controller
         $event = Event::where('slug', $slug)->where('is_active', true)->firstOrFail();
         $deviceToken = $this->getDeviceToken($request);
         $session = $this->getCameraSession($event, $deviceToken, $request);
+
+        // Check Event Duration Gate
+        if (!$event->isCameraOpen()) {
+            $status = $event->cameraStatus();
+            $message = $status === 'upcoming'
+                ? 'Kamera belum dibuka. Acara baru akan dimulai pada ' . ($event->starts_at?->translatedFormat('d M Y, H:i') ?? 'jadwal acara') . '.'
+                : 'Periode memotret telah berakhir pada ' . ($event->ends_at?->translatedFormat('d M Y, H:i') ?? 'jadwal acara') . '. Silakan nikmati galeri foto!';
+
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+                'camera_status' => $status,
+            ], 403);
+        }
 
         if ($session->isRollEmpty()) {
             return response()->json([

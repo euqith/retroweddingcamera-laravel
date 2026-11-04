@@ -93,7 +93,19 @@
 
     <!-- Actions -->
     <div class="space-y-3 pb-6">
-        @if($session->remaining_shots > 0)
+        @if(!$event->isCameraOpen())
+            @if($event->cameraStatus() === 'upcoming')
+                <div class="p-3.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs text-left">
+                    <span class="font-bold block mb-0.5">⏳ Kamera Belum Dibuka</span>
+                    <span>Acara akan dimulai pada <strong>{{ $event->starts_at?->translatedFormat('d F Y, H:i') }} WIB</strong>. Kamera akan aktif otomatis saat acara berlangsung.</span>
+                </div>
+            @else
+                <div class="p-3.5 bg-gray-100 border border-gray-200 text-gray-700 rounded-2xl text-xs text-left">
+                    <span class="font-bold block mb-0.5">🎞️ Periode Memotret Telah Selesai</span>
+                    <span>Acara telah berakhir pada <strong>{{ $event->ends_at?->translatedFormat('d F Y, H:i') }} WIB</strong>. Seluruh roll foto tamu dapat dilihat di galeri bersama!</span>
+                </div>
+            @endif
+        @elseif($session->remaining_shots > 0)
             <a href="{{ route('event.camera', $event->slug) }}"
                class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-wedding-gold to-wedding-goldHover text-white font-medium text-base tracking-wide shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">

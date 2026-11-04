@@ -1,5 +1,10 @@
 @extends('layouts.app', ['title' => 'Kamera — ' . $event->title])
 
+@php
+    $theme = $event->getThemeStyles();
+    $cameraStatus = $cameraStatus ?? $event->cameraStatus();
+@endphp
+
 @section('content')
 <div x-data="disposableCamera({
         slug: '{{ $event->slug }}',
@@ -11,10 +16,11 @@
         captureUrl: '{{ route('event.camera.capture', $event->slug) }}',
         galleryUrl: '{{ route('event.gallery', $event->slug) }}',
         landingUrl: '{{ route('event.landing', $event->slug) }}',
+        cameraStatus: '{{ $cameraStatus }}',
         initialMyPhotos: {{ json_encode($myPhotos) }}
     })"
     x-init="initCamera()"
-    class="relative min-h-screen bg-[#1c1917] flex flex-col items-center justify-between overflow-hidden select-none">
+    class="relative min-h-screen {{ $theme['page_bg'] }} flex flex-col items-center justify-between overflow-hidden select-none transition-colors duration-300">
 
     <!-- Screen Flash Overlay -->
     <div x-show="isFlashing"
@@ -44,7 +50,9 @@
         </a>
 
         <div class="text-center">
-            <span class="text-[10px] uppercase tracking-widest text-wedding-gold font-semibold block">Disposable Camera</span>
+            <span class="text-[10px] uppercase tracking-widest {{ $theme['accent_color'] }} font-bold block">
+                {{ $theme['decal_icon'] }} {{ $theme['name'] }}
+            </span>
             <h1 class="font-serif text-sm tracking-wide text-white/90 truncate max-w-[200px]">{{ $event->title }}</h1>
         </div>
 
@@ -62,28 +70,101 @@
         </button>
     </header>
 
-    <!-- Skeuomorphic Disposable Camera Body -->
-    <div class="relative w-full max-w-sm my-auto px-4 flex flex-col items-center">
-        <div class="w-full bg-[#FAF6F0] rounded-[2.5rem] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] border-4 border-[#231F1E] relative overflow-hidden">
-            <!-- Vintage Paper Sleeve Texture & Wedding Gold Foil Header -->
-            <div class="text-center pb-3 border-b border-wedding-gold/30">
-                <p class="font-serif text-lg tracking-wide text-[#231F1E] font-bold">
+    @if($cameraStatus !== 'open')
+        <!-- EVENT DURATION GATE (LOCKED / CLOSED CAMERA) -->
+        <div class="relative w-full max-w-sm my-auto px-4 flex flex-col items-center z-20">
+            <div class="w-full {{ $theme['body_bg'] }} rounded-[2.5rem] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.8)] border-4 {{ $theme['body_border'] }} text-center relative overflow-hidden transition-all">
+                @if($event->theme_preset === 'classic_film')
+                    <div class="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-red-600 via-amber-400 to-black"></div>
+                @elseif($event->theme_preset === 'sacred_olive')
+                    <div class="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#D4AF37] via-[#8FBC8F] to-[#D4AF37]"></div>
+                @endif
+
+                <!-- Vintage Lock Status Icon -->
+                <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-black/10 border-2 {{ $theme['header_border'] }} flex items-center justify-center text-3xl shadow-inner mt-2">
+                    {{ $cameraStatus === 'upcoming' ? '⏳' : '🎞️' }}
+                </div>
+
+                <span class="text-[10px] font-mono font-bold uppercase tracking-widest {{ $theme['accent_color'] }} block mb-1">
+                    {{ $cameraStatus === 'upcoming' ? 'Kamera Belum Dibuka' : 'Periode Foto Telah Selesai' }}
+                </span>
+
+                <h2 class="font-serif text-2xl font-bold {{ $theme['title_color'] }} mb-2">
                     {{ $event->title }}
-                </p>
-                <div class="flex items-center justify-center space-x-2 text-[10px] tracking-wider text-wedding-olive uppercase font-semibold">
-                    <span>36 Exposures</span>
-                    <span>•</span>
-                    <!-- Film Simulation Switcher Badge -->
-                    <button @click="showFilmModal = true"
-                            type="button"
-                            class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-wedding-dark/10 hover:bg-wedding-dark/20 text-[#231F1E] font-mono text-[9px] font-bold tracking-wider transition-colors border border-wedding-gold/40 shadow-xs"
-                            title="Ganti Simulasi Film">
-                        <span>🎞️</span>
-                        <span x-text="getActiveFilm().badge"></span>
-                        <span class="text-[8px] text-wedding-gold">▼</span>
-                    </button>
+                </h2>
+
+                <div class="p-4 rounded-2xl bg-black/10 border {{ $theme['header_border'] }} mb-4 text-xs text-left">
+                    @if($cameraStatus === 'upcoming')
+                        <span class="text-[10px] uppercase tracking-wider {{ $theme['sub_color'] }} font-semibold block mb-1">Jadwal Kamera Dibuka:</span>
+                        <span class="font-bold {{ $theme['title_color'] }} text-sm block">
+                            {{ $event->starts_at ? $event->starts_at->translatedFormat('l, d F Y - H:i') . ' WIB' : 'Jadwal Segera Dimulai' }}
+                        </span>
+                        <p class="text-[11px] {{ $theme['sub_color'] }} mt-2 leading-relaxed">
+                            Kamera disposable digital untuk acara ini akan aktif otomatis saat acara dimulai. Siapkan senyum terbaik Anda!
+                        </p>
+                    @else
+                        <span class="text-[10px] uppercase tracking-wider {{ $theme['sub_color'] }} font-semibold block mb-1">Acara Selesai Pada:</span>
+                        <span class="font-bold {{ $theme['title_color'] }} text-sm block">
+                            {{ $event->ends_at ? $event->ends_at->translatedFormat('l, d F Y - H:i') . ' WIB' : 'Acara Telah Berakhir' }}
+                        </span>
+                        <p class="text-[11px] {{ $theme['sub_color'] }} mt-2 leading-relaxed">
+                            Periode pengambilan foto tamu untuk acara ini telah ditutup. Seluruh foto yang berhasil diabadikan tersimpan aman dan dapat dinikmati di galeri bersama!
+                        </p>
+                    @endif
+                </div>
+
+                <div class="space-y-2">
+                    <a href="{{ route('event.gallery', $event->slug) }}"
+                       class="w-full py-3.5 px-4 rounded-xl bg-wedding-dark text-white font-semibold text-xs shadow hover:bg-black transition-colors flex items-center justify-center space-x-2">
+                        <span>Buka Galeri Foto Bersama Tamu</span>
+                        <span>➔</span>
+                    </a>
+
+                    <a href="{{ route('event.landing', $event->slug) }}"
+                       class="w-full py-2.5 px-4 rounded-xl bg-black/10 hover:bg-black/20 {{ $theme['title_color'] }} font-semibold text-xs transition-colors block">
+                        Kembali ke Info Acara
+                    </a>
                 </div>
             </div>
+        </div>
+    @else
+        <!-- Skeuomorphic Disposable Camera Body -->
+        <div class="relative w-full max-w-sm my-auto px-4 flex flex-col items-center">
+            <div class="w-full {{ $theme['body_bg'] }} rounded-[2.5rem] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] border-4 {{ $theme['body_border'] }} relative overflow-hidden transition-all duration-300">
+                <!-- Theme Specific Decals -->
+                @if($event->theme_preset === 'classic_film')
+                    <div class="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-red-600 via-amber-400 to-black"></div>
+                    <div class="absolute -top-6 -right-6 w-16 h-16 bg-black/10 rounded-full pointer-events-none"></div>
+                @elseif($event->theme_preset === 'sacred_olive')
+                    <div class="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#D4AF37] via-[#8FBC8F] to-[#D4AF37]"></div>
+                    <div class="absolute top-3 left-4 text-xs opacity-40 select-none pointer-events-none">🌿</div>
+                    <div class="absolute top-3 right-4 text-xs opacity-40 select-none pointer-events-none">🌿</div>
+                @else
+                    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-wedding-gold/40 to-transparent"></div>
+                @endif
+
+                <!-- Vintage Paper Sleeve Texture & Header -->
+                <div class="text-center pb-3 border-b {{ $theme['header_border'] }}">
+                    <div class="text-[9px] uppercase tracking-widest font-mono font-bold {{ $theme['accent_color'] }} mb-0.5">
+                        {{ $theme['decal_icon'] }} {{ $theme['tag'] }}
+                    </div>
+                    <p class="font-serif text-lg tracking-wide {{ $theme['title_color'] }} font-bold truncate">
+                        {{ $event->title }}
+                    </p>
+                    <div class="flex items-center justify-center space-x-2 text-[10px] tracking-wider {{ $theme['sub_color'] }} uppercase font-semibold">
+                        <span>{{ $event->max_shots_per_device }} Exposures</span>
+                        <span>•</span>
+                        <!-- Film Simulation Switcher Badge -->
+                        <button @click="showFilmModal = true"
+                                type="button"
+                                class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full {{ $theme['badge_style'] }} font-mono text-[9px] font-bold tracking-wider transition-colors shadow-xs"
+                                title="Ganti Simulasi Film">
+                            <span>🎞️</span>
+                            <span x-text="getActiveFilm().badge"></span>
+                            <span class="text-[8px] opacity-70">▼</span>
+                        </button>
+                    </div>
+                </div>
 
             <!-- Viewfinder Area -->
             <div class="relative w-full aspect-[4/3] bg-black rounded-2xl overflow-hidden my-4 border-4 border-[#18181b] shadow-inner">
@@ -298,6 +379,7 @@
             Tersisa: <span class="text-wedding-filmOrange font-bold" x-text="remainingShots"></span> / <span x-text="maxShots"></span> Foto
         </p>
     </footer>
+    @endif
 
     <!-- PRIVATE "ROLL SAYA" SLIDE-OVER DRAWER -->
     <div x-show="showMyGallery"
@@ -610,7 +692,10 @@ function disposableCamera(config) {
             return this.shotsTaken >= this.maxShots;
         },
 
+        cameraStatus: config.cameraStatus || 'open',
+
         async initCamera() {
+            if (this.cameraStatus !== 'open') return;
             this.initAudio();
             await this.startStream();
         },

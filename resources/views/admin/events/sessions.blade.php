@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Device Sessions & Reset Roll — ' . $event->title])
+@extends('layouts.app', ['title' => 'Device Sessions — ' . $event->title])
 
 @section('content')
 <div class="min-h-screen bg-[#FAF6F0] py-8 px-4 sm:px-6 lg:px-8">
@@ -12,23 +12,19 @@
                     </svg>
                 </a>
                 <div>
-                    <span class="text-xs uppercase tracking-widest text-wedding-gold font-bold block">Device Sessions & Testing Reset</span>
+                    <span class="text-xs uppercase tracking-widest text-wedding-gold font-bold block">Device Sessions Monitor</span>
                     <h1 class="font-serif text-2xl font-bold text-wedding-dark">{{ $event->title }}</h1>
                 </div>
             </div>
 
-            <!-- Reset All Button -->
-            <form action="{{ route('admin.events.sessions.reset-all', $event) }}" method="POST"
-                  onsubmit="return confirm('Apakah Anda yakin ingin me-reset kuota roll SEMUA perangkat pada event ini kembali ke 0/36?')">
-                @csrf
-                <button type="submit"
-                        class="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow transition-all flex items-center space-x-1.5">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
-                    </svg>
-                    <span>Reset Semua Roll (Testing Mode)</span>
-                </button>
-            </form>
+            <div class="flex items-center space-x-2">
+                <a href="{{ route('admin.events.gallery', $event) }}" class="px-3.5 py-2 rounded-xl bg-white border border-wedding-gold/20 hover:bg-wedding-linen text-wedding-dark text-xs font-semibold shadow-xs transition-colors">
+                    Galeri Event
+                </a>
+                <a href="{{ route('admin.events.qrcodes', $event) }}" class="px-3.5 py-2 rounded-xl bg-wedding-dark hover:bg-black text-white text-xs font-semibold shadow transition-colors">
+                    QR Codes
+                </a>
+            </div>
         </div>
 
         @if(session('success'))
@@ -42,7 +38,7 @@
             <div class="px-6 py-4 border-b border-wedding-gold/10 flex items-center justify-between">
                 <div>
                     <h2 class="font-serif text-lg font-bold text-wedding-dark">Daftar Device & Status Kuota Roll</h2>
-                    <p class="text-xs text-wedding-subtle">Setiap device dibatasi {{ $event->max_shots_per_device }} foto. Admin dapat me-reset kapan saja.</p>
+                    <p class="text-xs text-wedding-subtle">Setiap device dibatasi {{ $event->max_shots_per_device }} foto per roll.</p>
                 </div>
                 <span class="text-xs font-mono text-wedding-dark font-semibold">{{ $sessions->total() }} Device</span>
             </div>
@@ -56,8 +52,6 @@
                                 <th class="px-6 py-3">Roll Progress</th>
                                 <th class="px-6 py-3">Foto Tersimpan</th>
                                 <th class="px-6 py-3">Jepretan Terakhir</th>
-                                <th class="px-6 py-3">Reset</th>
-                                <th class="px-6 py-3 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-wedding-gold/10 text-wedding-dark">
@@ -98,21 +92,6 @@
 
                                     <td class="px-6 py-4 text-wedding-subtle">
                                         {{ $session->last_shot_at ? $session->last_shot_at->diffForHumans() : 'Belum memotret' }}
-                                    </td>
-
-                                    <td class="px-6 py-4 text-wedding-subtle font-mono">
-                                        {{ $session->reset_count }}x
-                                    </td>
-
-                                    <td class="px-6 py-4 text-right">
-                                        <form action="{{ route('admin.sessions.reset', $session) }}" method="POST"
-                                              onsubmit="return confirm('Reset kuota device ini ke 0/36?')">
-                                            @csrf
-                                            <button type="submit"
-                                                    class="px-3 py-1.5 bg-wedding-dark hover:bg-black text-white text-[11px] font-semibold rounded-lg shadow-sm transition-colors">
-                                                Reset Roll (0/36)
-                                            </button>
-                                        </form>
                                     </td>
                                 </tr>
                             @endforeach

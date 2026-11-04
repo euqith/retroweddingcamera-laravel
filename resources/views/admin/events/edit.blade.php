@@ -79,6 +79,33 @@
                 </div>
             </div>
 
+            <!-- Event Duration: Starts At & Ends At (Camera Active Window) -->
+            <div class="p-4 rounded-2xl bg-wedding-linen/60 border border-wedding-gold/30">
+                <div class="flex items-center space-x-2 mb-3">
+                    <span class="text-base">⏱️</span>
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-wedding-dark">Jadwal Durasi Acara & Kunci Kamera</h4>
+                        <p class="text-[11px] text-wedding-subtle">Kamera disposable hanya dapat digunakan memotret selama rentang waktu ini. Di luar jadwal, kamera terkunci otomatis (tamu diarahkan ke galeri).</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-wedding-dark mb-1">Waktu Mulai Acara</label>
+                        <input type="datetime-local" name="starts_at" value="{{ old('starts_at', $event->starts_at?->format('Y-m-d\TH:i')) }}"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-wedding-gold/30 focus:border-wedding-gold text-sm bg-white">
+                        <span class="text-[10px] text-wedding-subtle block mt-1">Kosongkan jika ingin kamera langsung aktif kapan saja.</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-wedding-dark mb-1">Waktu Selesai Acara</label>
+                        <input type="datetime-local" name="ends_at" value="{{ old('ends_at', $event->ends_at?->format('Y-m-d\TH:i')) }}"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-wedding-gold/30 focus:border-wedding-gold text-sm bg-white">
+                        <span class="text-[10px] text-wedding-subtle block mt-1">Setelah waktu ini, kamera otomatis ditutup & diarahkan ke galeri.</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Location -->
             <div>
                 <label class="block text-xs font-semibold uppercase tracking-wider text-wedding-dark mb-2">Lokasi Acara</label>

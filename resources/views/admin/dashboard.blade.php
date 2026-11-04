@@ -11,7 +11,7 @@
                 </span>
                 <div>
                     <h1 class="font-serif text-2xl font-bold text-wedding-dark">Admin Dashboard</h1>
-                    <p class="text-xs text-wedding-subtle">Manajemen Event, QR Code, dan Reset Roll Kamera</p>
+                    <p class="text-xs text-wedding-subtle">Manajemen Event, Jadwal Acara, dan Galeri Foto</p>
                 </div>
             </div>
 
@@ -117,7 +117,7 @@
 
                                 <a href="{{ route('admin.events.sessions', $event) }}"
                                    class="px-3 py-1.5 bg-wedding-dark text-white hover:bg-black text-xs font-semibold rounded-lg transition-colors flex items-center space-x-1">
-                                    <span>Device & Reset Roll</span>
+                                    <span>Device ({{ $event->camera_sessions_count }})</span>
                                 </a>
 
                                 <a href="{{ route('admin.events.edit', $event) }}"

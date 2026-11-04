@@ -19,6 +19,8 @@ class Event extends Model
         'slug',
         'event_type',
         'event_date',
+        'starts_at',
+        'ends_at',
         'location',
         'description',
         'theme_preset',
@@ -30,6 +32,8 @@ class Event extends Model
 
     protected $casts = [
         'event_date' => 'date',
+        'starts_at' => 'datetime',
+        'ends_at' => 'datetime',
         'max_shots_per_device' => 'integer',
         'is_active' => 'boolean',
         'is_gallery_public' => 'boolean',
@@ -108,6 +112,84 @@ class Event extends Model
     public function getGalleryUrlAttribute(): string
     {
         return url('/e/' . $this->slug . '/gallery');
+    }
+
+    /**
+     * Determine if camera can currently take photos based on event duration.
+     */
+    public function isCameraOpen(): bool
+    {
+        return $this->cameraStatus() === 'open';
+    }
+
+    /**
+     * Get camera access status ('open', 'upcoming', 'ended', 'inactive').
+     */
+    public function cameraStatus(): string
+    {
+        if (!$this->is_active) {
+            return 'inactive';
+        }
+
+        $now = now();
+
+        if ($this->starts_at && $now->lt($this->starts_at)) {
+            return 'upcoming';
+        }
+
+        if ($this->ends_at && $now->gt($this->ends_at)) {
+            return 'ended';
+        }
+
+        return 'open';
+    }
+
+    /**
+     * Get visual theme styling based on theme_preset.
+     */
+    public function getThemeStyles(): array
+    {
+        return match ($this->theme_preset) {
+            'sacred_olive' => [
+                'name' => 'Sacred Olive (Church / Botanical)',
+                'page_bg' => 'bg-[#182019]',
+                'body_bg' => 'bg-[#273529]',
+                'body_border' => 'border-[#1B251D]',
+                'header_border' => 'border-[#C8AE7D]/35',
+                'title_color' => 'text-[#FAF6F0]',
+                'sub_color' => 'text-[#A2B89B]',
+                'badge_style' => 'bg-[#1B251D] text-[#D4AF37] border border-[#C8AE7D]/40',
+                'accent_color' => 'text-[#D4AF37]',
+                'tag' => 'Sacred Church / Botanical Edition',
+                'decal_icon' => '🌿',
+            ],
+            'classic_film' => [
+                'name' => 'Classic 35mm Analog',
+                'page_bg' => 'bg-[#141414]',
+                'body_bg' => 'bg-[#E5A93C]',
+                'body_border' => 'border-[#1f1b1a]',
+                'header_border' => 'border-[#231F1E]/30',
+                'title_color' => 'text-[#231F1E]',
+                'sub_color' => 'text-[#4A3800]',
+                'badge_style' => 'bg-[#231F1E] text-[#F2B705] border border-black',
+                'accent_color' => 'text-[#C9381E]',
+                'tag' => 'Vintage 35mm Single-Use Camera',
+                'decal_icon' => '🎞️',
+            ],
+            default => [ // ivory_gold
+                'name' => 'Ivory & Gold (Wedding Classic)',
+                'page_bg' => 'bg-[#1F1B1A]',
+                'body_bg' => 'bg-[#FAF6F0]',
+                'body_border' => 'border-[#231F1E]',
+                'header_border' => 'border-wedding-gold/30',
+                'title_color' => 'text-[#231F1E]',
+                'sub_color' => 'text-wedding-olive',
+                'badge_style' => 'bg-wedding-dark text-wedding-gold border border-wedding-gold/40',
+                'accent_color' => 'text-wedding-gold',
+                'tag' => 'Wedding Classic Edition',
+                'decal_icon' => '✨',
+            ],
+        };
     }
 }
 

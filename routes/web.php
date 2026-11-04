@@ -51,10 +51,8 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
     Route::get('/events/{event}/gallery', [AdminController::class, 'gallery'])->name('events.gallery');
     Route::post('/events/{event}/gallery/clear', [AdminController::class, 'clearEventPhotos'])->name('events.gallery.clear');
 
-    // Device Sessions & Roll Reset
+    // Device Sessions Monitor (Read-Only)
     Route::get('/events/{event}/sessions', [AdminController::class, 'sessions'])->name('events.sessions');
-    Route::post('/events/{event}/sessions/reset-all', [AdminController::class, 'resetAllSessions'])->name('events.sessions.reset-all');
-    Route::post('/sessions/{session}/reset', [AdminController::class, 'resetSession'])->name('sessions.reset');
 
     // Photo moderation (Delete single photo)
     Route::delete('/photos/{photo}', [AdminController::class, 'deletePhoto'])->name('photos.destroy');
