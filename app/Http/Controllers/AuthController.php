@@ -22,23 +22,29 @@ class AuthController extends Controller
     }
 
     /**
-     * Handle login authentication
+     * Handle login authentication by username or email
      */
     public function login(Request $request)
     {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
+        $request->validate([
+            'login' => ['required', 'string'],
             'password' => ['required', 'string'],
         ]);
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
+        $login = $request->input('login');
+        $password = $request->input('password');
+
+        $user = User::where('name', $login)->orWhere('email', $login)->first();
+
+        if ($user && Hash::check($password, $user->password)) {
+            Auth::login($user, $request->boolean('remember'));
             $request->session()->regenerate();
             return redirect()->intended(route('admin.dashboard'));
         }
 
         return back()->withErrors([
-            'email' => 'Email atau password yang Anda masukkan tidak sesuai.',
-        ])->onlyInput('email');
+            'login' => 'Username/email atau password yang Anda masukkan tidak sesuai.',
+        ])->onlyInput('login');
     }
 
     /**
@@ -46,12 +52,12 @@ class AuthController extends Controller
      */
     public function quickLogin(Request $request)
     {
-        $user = User::first();
+        $user = User::where('name', 'adminretro')->first() ?? User::first();
         if (!$user) {
             $user = User::create([
-                'name' => 'Event Organizer Admin',
-                'email' => 'admin@retrocamera.test',
-                'password' => Hash::make('password'),
+                'name' => 'adminretro',
+                'email' => 'adminretro@kurisu.id',
+                'password' => Hash::make('Adm1n456'),
             ]);
         }
 

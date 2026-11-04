@@ -19,8 +19,16 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Admin User
+        // 1. Admin Users
         $admin = User::firstOrCreate(
+            ['email' => 'adminretro@kurisu.id'],
+            [
+                'name' => 'adminretro',
+                'password' => Hash::make('Adm1n456'),
+            ]
+        );
+
+        User::firstOrCreate(
             ['email' => 'admin@retrocamera.test'],
             [
                 'name' => 'Event Admin',

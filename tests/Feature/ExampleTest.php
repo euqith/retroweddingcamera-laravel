@@ -24,14 +24,12 @@ class ExampleTest extends TestCase
 
     public function test_login_authenticates_and_redirects_to_admin(): void
     {
-        $user = \App\Models\User::factory()->create([
-            'email' => 'admin@retrocamera.test',
-            'password' => bcrypt('password'),
-        ]);
+        $user = \App\Models\User::where('name', 'adminretro')->first();
 
+        // Test login using username
         $response = $this->post('/login', [
-            'email' => 'admin@retrocamera.test',
-            'password' => 'password',
+            'login' => 'adminretro',
+            'password' => 'Adm1n456',
         ]);
 
         $response->assertRedirect('/admin');

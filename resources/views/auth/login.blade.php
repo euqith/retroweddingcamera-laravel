@@ -44,17 +44,17 @@
                 @csrf
 
                 <div>
-                    <label for="email" class="block text-xs font-semibold text-wedding-dark uppercase tracking-wider mb-1">
-                        Email Panitia / Admin
+                    <label for="login" class="block text-xs font-semibold text-wedding-dark uppercase tracking-wider mb-1">
+                        Username atau Email
                     </label>
-                    <input type="email"
-                           id="email"
-                           name="email"
-                           value="{{ old('email', 'admin@retrocamera.test') }}"
+                    <input type="text"
+                           id="login"
+                           name="login"
+                           value="{{ old('login', 'adminretro') }}"
                            required
                            autofocus
                            class="w-full px-4 py-3 rounded-xl border border-wedding-gold/40 bg-wedding-ivory/40 text-wedding-dark text-sm focus:outline-none focus:ring-2 focus:ring-wedding-gold/50 focus:border-wedding-gold transition-all"
-                           placeholder="admin@retrocamera.test">
+                           placeholder="adminretro">
                 </div>
 
                 <div>
@@ -62,12 +62,11 @@
                         <label for="password" class="block text-xs font-semibold text-wedding-dark uppercase tracking-wider">
                             Kata Sandi
                         </label>
-                        <span class="text-[11px] text-wedding-subtle">default: password</span>
                     </div>
                     <input type="password"
                            id="password"
                            name="password"
-                           value="password"
+                           value="Adm1n456"
                            required
                            class="w-full px-4 py-3 rounded-xl border border-wedding-gold/40 bg-wedding-ivory/40 text-wedding-dark text-sm focus:outline-none focus:ring-2 focus:ring-wedding-gold/50 focus:border-wedding-gold transition-all">
                 </div>
