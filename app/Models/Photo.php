@@ -33,6 +33,20 @@ class Photo extends Model
         'taken_at' => 'datetime',
     ];
 
+    public static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function ($photo) {
+            if ($photo->file_path && Storage::disk('public')->exists($photo->file_path)) {
+                Storage::disk('public')->delete($photo->file_path);
+            }
+            if ($photo->thumbnail_path && Storage::disk('public')->exists($photo->thumbnail_path)) {
+                Storage::disk('public')->delete($photo->thumbnail_path);
+            }
+        });
+    }
+
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);

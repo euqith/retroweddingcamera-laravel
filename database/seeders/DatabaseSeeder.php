@@ -86,7 +86,7 @@ class DatabaseSeeder extends Seeder
             foreach ($files as $file) {
                 if (in_array(strtolower($file->getExtension()), ['jpg', 'jpeg', 'png'])) {
                     $filename = 'photo_' . $shotNumber . '_' . Str::random(8) . '.' . $file->getExtension();
-                    $destinationPath = 'photos/' . $wedding->id . '/' . $filename;
+                    $destinationPath = 'photos/' . $wedding->slug . '/' . $filename;
 
                     Storage::disk('public')->put($destinationPath, File::get($file->getRealPath()));
 

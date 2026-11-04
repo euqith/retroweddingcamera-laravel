@@ -17,14 +17,14 @@ class ImageProcessingService
     }
 
     /**
-     * Process and store a captured photo.
+     * Process and store a captured photo in a folder named after the event.
      *
      * @param string $imageData Base64 encoded, Data URI, or raw binary string
-     * @param int $eventId
+     * @param string|int $eventIdentifier Event slug or name (or legacy id)
      * @param int $shotNumber
      * @return array [file_path, thumbnail_path]
      */
-    public function storeCapturedPhoto(string $imageData, int $eventId, int $shotNumber): array
+    public function storeCapturedPhoto(string $imageData, string|int $eventIdentifier, int $shotNumber): array
     {
         // Decode image using Intervention Image v4
         if (str_starts_with($imageData, 'data:image')) {
@@ -38,7 +38,12 @@ class ImageProcessingService
 
         $uuid = Str::uuid()->toString();
         $filename = "shot_{$shotNumber}_{$uuid}.jpg";
-        $folder = "photos/{$eventId}";
+        
+        $folderSlug = Str::slug((string) $eventIdentifier);
+        if (empty($folderSlug)) {
+            $folderSlug = 'general';
+        }
+        $folder = "photos/{$folderSlug}";
 
         $mainPath = "{$folder}/{$filename}";
         $thumbPath = "{$folder}/thumb_{$filename}";

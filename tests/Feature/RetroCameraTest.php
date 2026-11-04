@@ -151,5 +151,51 @@ class RetroCameraTest extends TestCase
         $response->assertSee('Buka Kamera Disposable');
         $response->assertSee('Buka Galeri Foto');
     }
+
+    public function test_captured_photo_is_stored_in_event_slug_folder(): void
+    {
+        $dummyBase64 = 'data:image/png;base64,' . base64_encode(
+            imagepng(imagecreatetruecolor(50, 50)) ? ob_get_clean() : ''
+        );
+
+        $response = $this->postJson('/e/daniel-clara/camera/capture', [
+            'image' => $dummyBase64,
+            'camera_facing' => 'environment',
+            'flash_enabled' => false,
+        ]);
+
+        $response->assertStatus(200);
+        $photo = Photo::first();
+        $this->assertNotNull($photo);
+        $this->assertStringStartsWith('photos/daniel-clara/', $photo->file_path);
+        Storage::disk('public')->assertExists($photo->file_path);
+    }
+
+    public function test_deleting_event_removes_photo_folder_and_files_from_server(): void
+    {
+        $dummyBase64 = 'data:image/png;base64,' . base64_encode(
+            imagepng(imagecreatetruecolor(50, 50)) ? ob_get_clean() : ''
+        );
+
+        $this->postJson('/e/daniel-clara/camera/capture', [
+            'image' => $dummyBase64,
+            'camera_facing' => 'environment',
+            'flash_enabled' => false,
+        ]);
+
+        $photo = Photo::first();
+        Storage::disk('public')->assertExists($photo->file_path);
+
+        // Delete the event
+        $response = $this->delete("/admin/events/{$this->event->id}");
+        $response->assertRedirect('/admin');
+
+        // Verify folder and files on disk are removed
+        Storage::disk('public')->assertMissing($photo->file_path);
+        Storage::disk('public')->assertMissing($photo->thumbnail_path);
+        $this->assertEmpty(Storage::disk('public')->allFiles("photos/daniel-clara"));
+        $this->assertDatabaseMissing('events', ['id' => $this->event->id]);
+        $this->assertDatabaseMissing('photos', ['id' => $photo->id]);
+    }
 }
 

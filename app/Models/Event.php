@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Event extends Model
@@ -48,6 +49,35 @@ class Event extends Model
                 }
                 $event->slug = $slug;
             }
+        });
+
+        // Automatically clean up photo folder & files when event is deleted
+        static::deleting(function ($event) {
+            // Delete all photo files and thumbnails
+            foreach ($event->photos as $photo) {
+                if ($photo->file_path && Storage::disk('public')->exists($photo->file_path)) {
+                    Storage::disk('public')->delete($photo->file_path);
+                }
+                if ($photo->thumbnail_path && Storage::disk('public')->exists($photo->thumbnail_path)) {
+                    Storage::disk('public')->delete($photo->thumbnail_path);
+                }
+            }
+
+            // Delete event's photo directory on server
+            $slugFolder = "photos/{$event->slug}";
+            if (Storage::disk('public')->exists($slugFolder)) {
+                Storage::disk('public')->deleteDirectory($slugFolder);
+            }
+
+            // Also check legacy folder by ID if any
+            $idFolder = "photos/{$event->id}";
+            if (Storage::disk('public')->exists($idFolder)) {
+                Storage::disk('public')->deleteDirectory($idFolder);
+            }
+
+            // Cascade delete child database records
+            $event->photos()->delete();
+            $event->cameraSessions()->delete();
         });
     }
 

@@ -119,10 +119,10 @@ class EventController extends Controller
 
         $shotNumber = $session->shots_taken + 1;
 
-        // Process and store the image using Intervention Image
+        // Process and store the image using Intervention Image in event slug folder
         $stored = $imageService->storeCapturedPhoto(
             $request->input('image'),
-            $event->id,
+            $event->slug,
             $shotNumber
         );
 
