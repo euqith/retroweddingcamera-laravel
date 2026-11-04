@@ -48,6 +48,7 @@ class AdminController extends Controller
             'description' => 'nullable|string',
             'theme_preset' => 'required|string|in:ivory_gold,sacred_olive,classic_film',
             'filter_preset' => 'required|string|in:fuji_quicksnap,kodak_funsaver,warm_portra,ilford_bw,cinestill_800t,agfa_vista,lomography_color',
+            'show_date_stamp' => 'nullable|boolean',
             'max_shots_per_device' => 'required|integer|min:1|max:100',
             'is_active' => 'nullable|boolean',
             'is_gallery_public' => 'nullable|boolean',
@@ -57,6 +58,7 @@ class AdminController extends Controller
             $validated['slug'] = Str::slug($validated['title']);
         }
 
+        $validated['show_date_stamp'] = $request->has('show_date_stamp');
         $validated['is_active'] = $request->has('is_active');
         $validated['is_gallery_public'] = $request->has('is_gallery_public');
 
@@ -98,9 +100,11 @@ class AdminController extends Controller
             'description' => 'nullable|string',
             'theme_preset' => 'required|string|in:ivory_gold,sacred_olive,classic_film',
             'filter_preset' => 'required|string|in:fuji_quicksnap,kodak_funsaver,warm_portra,ilford_bw,cinestill_800t,agfa_vista,lomography_color',
+            'show_date_stamp' => 'nullable|boolean',
             'max_shots_per_device' => 'required|integer|min:1|max:100',
         ]);
 
+        $validated['show_date_stamp'] = $request->has('show_date_stamp');
         $validated['is_active'] = $request->has('is_active');
         $validated['is_gallery_public'] = $request->has('is_gallery_public');
 

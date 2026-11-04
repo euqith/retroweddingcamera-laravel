@@ -148,6 +148,19 @@
 
             <!-- Options -->
             <div class="space-y-3 pt-2">
+                <div class="p-3.5 rounded-xl bg-wedding-ivory/60 border border-wedding-gold/25">
+                    <label class="flex items-start space-x-3 cursor-pointer">
+                        <input type="checkbox" name="show_date_stamp" value="1" {{ old('show_date_stamp', true) ? 'checked' : '' }}
+                               class="w-4 h-4 mt-0.5 text-wedding-gold rounded border-wedding-gold/40 focus:ring-wedding-gold">
+                        <div>
+                            <span class="text-xs text-wedding-dark font-bold block">Tampilkan Cap Tanggal Analog (Date Stamp)</span>
+                            <span class="text-[11px] text-wedding-subtle block mt-0.5">
+                                Mencetak watermark cap tanggal vintage ('YY MM DD) berwarna oranye/emas khas kamera analog di pojok foto. Tamu juga dapat menyalakan/mematikan tombol tanggal langsung di kamera.
+                            </span>
+                        </div>
+                    </label>
+                </div>
+
                 <label class="flex items-center space-x-3 cursor-pointer">
                     <input type="checkbox" name="is_active" value="1" {{ old('is_active', true) ? 'checked' : '' }}
                            class="w-4 h-4 text-wedding-gold rounded border-wedding-gold/40 focus:ring-wedding-gold">

@@ -97,10 +97,12 @@
                                  loading="lazy"
                                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
 
-                            <!-- Date Stamp on thumbnail -->
-                            <div class="absolute bottom-2 right-2 film-date-stamp text-[10px] pointer-events-none select-none">
-                                '{{ $photo->taken_at->format('y m d') }}
-                            </div>
+                            <!-- Date Stamp on thumbnail (if enabled for event) -->
+                            @if($event->show_date_stamp)
+                                <div class="absolute bottom-2 right-2 film-date-stamp text-[10px] pointer-events-none select-none">
+                                    '{{ $photo->taken_at->format('y m d') }}
+                                </div>
+                            @endif
 
                             @if($photo->camera_facing === 'user')
                                 <span class="absolute top-2 left-2 bg-black/50 backdrop-blur-sm text-white text-[9px] px-1.5 py-0.5 rounded-md font-mono">
@@ -184,9 +186,11 @@
                 <img :src="selectedPhoto ? selectedPhoto.url : ''"
                      class="w-full h-full object-contain">
 
-                <div class="absolute bottom-3 right-3 film-date-stamp text-xs pointer-events-none select-none">
-                    '{{ date('y m d') }}
-                </div>
+                @if($event->show_date_stamp)
+                    <div class="absolute bottom-3 right-3 film-date-stamp text-xs pointer-events-none select-none">
+                        '{{ date('y m d') }}
+                    </div>
+                @endif
             </div>
 
             <!-- Details & Actions -->

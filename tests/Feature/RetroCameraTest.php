@@ -455,5 +455,84 @@ class RetroCameraTest extends TestCase
         $this->event->refresh();
         $this->assertEquals('fuji_quicksnap', $this->event->filter_preset);
     }
+
+    public function test_admin_can_toggle_show_date_stamp_on_event_create_and_update(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        // 1. Create event with show_date_stamp enabled
+        $createResponse = $this->post('/admin/events', [
+            'title' => 'Event With Date Stamp',
+            'slug' => 'event-with-date',
+            'event_type' => 'wedding',
+            'theme_preset' => 'ivory_gold',
+            'filter_preset' => 'fuji_quicksnap',
+            'max_shots_per_device' => 36,
+            'show_date_stamp' => '1',
+            'is_active' => '1',
+        ]);
+        $createResponse->assertRedirect();
+        $eventA = Event::where('slug', 'event-with-date')->first();
+        $this->assertNotNull($eventA);
+        $this->assertTrue($eventA->show_date_stamp);
+
+        // 2. Create event with show_date_stamp disabled
+        $createResponseB = $this->post('/admin/events', [
+            'title' => 'Event Without Date Stamp',
+            'slug' => 'event-without-date',
+            'event_type' => 'general',
+            'theme_preset' => 'sacred_olive',
+            'filter_preset' => 'warm_portra',
+            'max_shots_per_device' => 24,
+            // show_date_stamp omitted (unchecked checkbox)
+            'is_active' => '1',
+        ]);
+        $createResponseB->assertRedirect();
+        $eventB = Event::where('slug', 'event-without-date')->first();
+        $this->assertNotNull($eventB);
+        $this->assertFalse($eventB->show_date_stamp);
+
+        // 3. Update event: toggle show_date_stamp from true to false
+        $updateResponse = $this->put("/admin/events/{$eventA->id}", [
+            'title' => 'Event With Date Stamp (Updated)',
+            'slug' => 'event-with-date',
+            'event_type' => 'wedding',
+            'theme_preset' => 'ivory_gold',
+            'filter_preset' => 'fuji_quicksnap',
+            'max_shots_per_device' => 36,
+            // show_date_stamp omitted -> false
+        ]);
+        $updateResponse->assertRedirect();
+        $eventA->refresh();
+        $this->assertFalse($eventA->show_date_stamp);
+
+        // 4. Update event: toggle show_date_stamp back to true
+        $updateResponse2 = $this->put("/admin/events/{$eventA->id}", [
+            'title' => 'Event With Date Stamp (Re-enabled)',
+            'slug' => 'event-with-date',
+            'event_type' => 'wedding',
+            'theme_preset' => 'ivory_gold',
+            'filter_preset' => 'fuji_quicksnap',
+            'max_shots_per_device' => 36,
+            'show_date_stamp' => '1',
+        ]);
+        $updateResponse2->assertRedirect();
+        $eventA->refresh();
+        $this->assertTrue($eventA->show_date_stamp);
+    }
+
+    public function test_camera_receives_show_date_stamp_setting_from_event(): void
+    {
+        $this->event->update(['show_date_stamp' => false]);
+
+        $response = $this->get("/e/{$this->event->slug}/camera");
+        $response->assertStatus(200);
+        $response->assertSee('showDateStamp: false', false);
+
+        $this->event->update(['show_date_stamp' => true]);
+        $response2 = $this->get("/e/{$this->event->slug}/camera");
+        $response2->assertStatus(200);
+        $response2->assertSee('showDateStamp: true', false);
+    }
 }
 

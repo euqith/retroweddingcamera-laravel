@@ -17,6 +17,7 @@
         galleryUrl: '{{ route('event.gallery', $event->slug) }}',
         landingUrl: '{{ route('event.landing', $event->slug) }}',
         cameraStatus: '{{ $cameraStatus }}',
+        showDateStamp: {{ $event->show_date_stamp ? 'true' : 'false' }},
         initialMyPhotos: {{ json_encode($myPhotos) }}
     })"
     x-init="initCamera()"
@@ -163,6 +164,15 @@
                             <span x-text="getActiveFilm().badge"></span>
                             <span class="text-[8px] opacity-70">▼</span>
                         </button>
+                        <span>•</span>
+                        <!-- Date Stamp Switcher Badge -->
+                        <button @click="toggleDateStamp()"
+                                type="button"
+                                class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full font-mono text-[9px] font-bold tracking-wider transition-all shadow-xs cursor-pointer"
+                                :class="showDateStamp ? '{{ $theme['badge_style'] }}' : 'bg-black/25 text-white/50 border border-white/20 hover:text-white'"
+                                title="Nyalakan / Matikan cap tanggal foto ('YY MM DD)">
+                            <span x-text="showDateStamp ? '📅 DATE: ON' : '📅 DATE: OFF'"></span>
+                        </button>
                     </div>
                 </div>
 
@@ -199,14 +209,22 @@
                     </div>
                 </div>
 
-                <!-- Live Quartz Date Stamp Overlay Preview -->
-                <div class="absolute bottom-3 right-3 film-date-stamp text-xs pointer-events-none select-none transition-all duration-300"
-                     :style="{
-                         color: getDateColor(),
-                         textShadow: '0 0 6px ' + getDateColor()
-                     }">
-                    '{{ date('y m d') }}
-                </div>
+                <!-- Live Quartz Date Stamp Overlay Preview & Interactive Quick Toggle -->
+                <button @click="toggleDateStamp()"
+                        type="button"
+                        class="absolute bottom-2.5 right-2.5 z-20 px-2 py-0.5 rounded-lg transition-all duration-200 select-none cursor-pointer flex items-center space-x-1.5 shadow-sm"
+                        :class="showDateStamp ? 'bg-black/35 hover:bg-black/55' : 'bg-black/60 hover:bg-black/80 ring-1 ring-white/20'"
+                        title="Klik untuk menyalakan atau mematikan cetak tanggal foto">
+                    <span class="film-date-stamp text-xs transition-all duration-300"
+                          :style="{
+                              color: showDateStamp ? getDateColor() : '#9ca3af',
+                              textShadow: showDateStamp ? '0 0 6px ' + getDateColor() : 'none'
+                          }"
+                          x-text="showDateStamp ? '\'{{ date('y m d') }}' : '-- -- --'"></span>
+                    <span class="text-[8px] font-mono tracking-tighter uppercase px-1 py-0.2 rounded font-bold"
+                          :class="showDateStamp ? 'bg-amber-500/30 text-amber-300' : 'bg-zinc-700 text-zinc-400'"
+                          x-text="showDateStamp ? 'DATE' : 'OFF'"></span>
+                </button>
 
                 <!-- Camera Error / Native Mode Overlay -->
                 <div x-show="cameraError && !isRollEmpty"
@@ -421,9 +439,11 @@
                                 <div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-black/5">
                                     <img :src="photo.thumbnail_url"
                                          class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
-                                    <div class="absolute bottom-1 right-1 film-date-stamp text-[9px] pointer-events-none select-none">
-                                        '{{ date('y m d') }}
-                                    </div>
+                                    <template x-if="showDateStamp">
+                                        <div class="absolute bottom-1 right-1 film-date-stamp text-[9px] pointer-events-none select-none">
+                                            '{{ date('y m d') }}
+                                        </div>
+                                    </template>
                                 </div>
                                 <div class="mt-1.5 px-1 flex items-center justify-between text-[10px] text-wedding-subtle">
                                     <span class="font-mono font-bold text-wedding-dark" x-text="'#' + photo.shot_number"></span>
@@ -566,6 +586,22 @@ function disposableCamera(config) {
         previewPhoto: null,
         showFilmModal: false,
         defaultPreset: config.filterPreset || 'fuji_quicksnap',
+        initialShowDateStamp: typeof config.showDateStamp !== 'undefined' ? config.showDateStamp : true,
+        showDateStamp: (function() {
+            try {
+                const stored = localStorage.getItem('retro_date_' + config.slug);
+                if (stored !== null) return JSON.parse(stored);
+            } catch (e) {}
+            return typeof config.showDateStamp !== 'undefined' ? config.showDateStamp : true;
+        })(),
+
+        toggleDateStamp() {
+            this.showDateStamp = !this.showDateStamp;
+            try {
+                localStorage.setItem('retro_date_' + this.slug, JSON.stringify(this.showDateStamp));
+            } catch (e) {}
+        },
+
         currentPreset: (function() {
             try {
                 return localStorage.getItem('retro_film_' + config.slug) || config.filterPreset || 'fuji_quicksnap';
@@ -1167,20 +1203,22 @@ function disposableCamera(config) {
             ctx.fillRect(0, 0, width, height);
             ctx.restore();
 
-            // 4. Vintage Quartz Date Stamp ('YY MM DD) in bottom-right corner
-            const dateColor = this.getDateColor();
-            const dateStr = `'${String(new Date().getFullYear()).slice(-2)} ${String(new Date().getMonth() + 1).padStart(2, '0')} ${String(new Date().getDate()).padStart(2, '0')}`;
-            const fontSize = Math.max(22, Math.floor(width * 0.026));
+            // 4. Vintage Quartz Date Stamp ('YY MM DD) in bottom-right corner (if enabled)
+            if (this.showDateStamp) {
+                const dateColor = this.getDateColor();
+                const dateStr = `'${String(new Date().getFullYear()).slice(-2)} ${String(new Date().getMonth() + 1).padStart(2, '0')} ${String(new Date().getDate()).padStart(2, '0')}`;
+                const fontSize = Math.max(22, Math.floor(width * 0.026));
 
-            ctx.save();
-            ctx.font = `bold ${fontSize}px "Share Tech Mono", monospace`;
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'bottom';
-            ctx.shadowColor = dateColor;
-            ctx.shadowBlur = fontSize * 0.4;
-            ctx.fillStyle = dateColor;
-            ctx.fillText(dateStr, width - (fontSize * 1.2), height - (fontSize * 1.2));
-            ctx.restore();
+                ctx.save();
+                ctx.font = `bold ${fontSize}px "Share Tech Mono", monospace`;
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'bottom';
+                ctx.shadowColor = dateColor;
+                ctx.shadowBlur = fontSize * 0.4;
+                ctx.fillStyle = dateColor;
+                ctx.fillText(dateStr, width - (fontSize * 1.2), height - (fontSize * 1.2));
+                ctx.restore();
+            }
         }
     };
 }
