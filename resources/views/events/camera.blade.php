@@ -502,42 +502,37 @@ function disposableCamera(config) {
             } catch (e) {}
         },
 
-        // Real-Time Viewfinder Video Filter Simulation (GPU Accelerated)
-        getVideoFilterStyle() {
-            let filter = '';
-            switch (this.currentPreset) {
+        // Single Source of Truth for Film Simulation Curves
+        getFilterString(preset = this.currentPreset) {
+            switch (preset) {
                 case 'ilford_bw':
-                    filter = 'grayscale(100%) contrast(1.35) brightness(0.96)';
-                    break;
+                    return 'grayscale(100%) contrast(1.35) brightness(0.96)';
                 case 'kodak_funsaver':
                     // Warm golden amber, rich tone rolloff
-                    filter = 'sepia(0.24) saturate(1.28) contrast(1.24) brightness(1.02) hue-rotate(-10deg)';
-                    break;
+                    return 'sepia(0.24) saturate(1.28) contrast(1.24) brightness(1.02) hue-rotate(-10deg)';
                 case 'warm_portra':
                     // Soft pastel wedding skin tones, gentle creamy rolloff
-                    filter = 'sepia(0.12) saturate(1.10) contrast(1.12) brightness(1.04) hue-rotate(-4deg)';
-                    break;
+                    return 'sepia(0.12) saturate(1.10) contrast(1.12) brightness(1.04) hue-rotate(-4deg)';
                 case 'cinestill_800t':
                     // Cinema tungsten cool shadows & amber highlights
-                    filter = 'contrast(1.24) saturate(1.22) brightness(0.97) hue-rotate(14deg)';
-                    break;
+                    return 'contrast(1.24) saturate(1.22) brightness(0.97) hue-rotate(14deg)';
                 case 'agfa_vista':
                     // Vibrant 90s primary colors & punchy saturation
-                    filter = 'contrast(1.26) saturate(1.38) brightness(1.02)';
-                    break;
+                    return 'contrast(1.26) saturate(1.38) brightness(1.02)';
                 case 'lomography_color':
                     // Toy camera cross-process & deep shadows
-                    filter = 'contrast(1.32) saturate(1.32) brightness(0.95) hue-rotate(-14deg)';
-                    break;
+                    return 'contrast(1.32) saturate(1.32) brightness(0.95) hue-rotate(-14deg)';
                 default: // fuji_quicksnap
                     // Clean, emerald shadows & high whites pop
-                    filter = 'contrast(1.24) brightness(1.04) saturate(1.12) hue-rotate(5deg)';
-                    break;
+                    return 'contrast(1.24) brightness(1.04) saturate(1.12) hue-rotate(5deg)';
             }
+        },
 
+        // Real-Time Viewfinder Video Filter Simulation (GPU Accelerated)
+        getVideoFilterStyle() {
             const mirror = this.facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
             return {
-                filter: filter,
+                filter: this.getFilterString(this.currentPreset),
                 transform: mirror,
                 transition: 'filter 0.35s ease, transform 0.2s ease'
             };
@@ -752,14 +747,38 @@ function disposableCamera(config) {
             canvas.width = outputWidth;
             canvas.height = outputHeight;
 
-            ctx.save();
+            // 1. Capture exact 4:3 crop to temporary offscreen buffer
+            const offscreen = document.createElement('canvas');
+            offscreen.width = outputWidth;
+            offscreen.height = outputHeight;
+            const offCtx = offscreen.getContext('2d');
+
+            offCtx.save();
             if (this.facingMode === 'user') {
-                ctx.translate(outputWidth, 0);
-                ctx.scale(-1, 1);
+                offCtx.translate(outputWidth, 0);
+                offCtx.scale(-1, 1);
             }
             // Draw exact 4:3 landscape slice that was framed inside the viewfinder
-            ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, outputWidth, outputHeight);
-            ctx.restore();
+            offCtx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, outputWidth, outputHeight);
+            offCtx.restore();
+
+            // 2. Render from offscreen to main canvas with the EXACT CSS film filter used by viewfinder
+            canvas.width = outputWidth;
+            canvas.height = outputHeight;
+
+            const filterStr = this.getFilterString(this.currentPreset);
+            let filterRendered = false;
+
+            try {
+                ctx.save();
+                ctx.filter = filterStr;
+                ctx.drawImage(offscreen, 0, 0);
+                ctx.restore();
+                filterRendered = true;
+            } catch (err) {
+                filterRendered = false;
+                ctx.drawImage(offscreen, 0, 0);
+            }
 
             // Turn off screen flash & hardware torch immediately
             if (this.flashEnabled) {
@@ -774,8 +793,8 @@ function disposableCamera(config) {
                 }
             }
 
-            // Apply selected film stock filter recipe
-            this.applyDisposableFilter(ctx, outputWidth, outputHeight, this.flashEnabled, this.currentPreset);
+            // 3. Apply authentic analog finishing (Flash, grain, lens vignette, quartz date stamp)
+            this.applyAnalogFinishing(ctx, outputWidth, outputHeight, this.flashEnabled, this.currentPreset, !filterRendered);
 
             const imageData = canvas.toDataURL('image/jpeg', 0.90);
             await this.uploadPhotoData(imageData);
@@ -815,12 +834,33 @@ function disposableCamera(config) {
                     const outputWidth = Math.min(1920, Math.max(1280, cropW));
                     const outputHeight = Math.round(outputWidth / targetAspect);
 
+                    // Offscreen raw crop
+                    const offscreen = document.createElement('canvas');
+                    offscreen.width = outputWidth;
+                    offscreen.height = outputHeight;
+                    const offCtx = offscreen.getContext('2d');
+                    offCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outputWidth, outputHeight);
+
+                    // Main canvas with identical viewfinder film filter
                     canvas.width = outputWidth;
                     canvas.height = outputHeight;
-                    ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outputWidth, outputHeight);
 
-                    // Apply selected film stock filter recipe
-                    this.applyDisposableFilter(ctx, outputWidth, outputHeight, this.flashEnabled, this.currentPreset);
+                    const filterStr = this.getFilterString(this.currentPreset);
+                    let filterRendered = false;
+
+                    try {
+                        ctx.save();
+                        ctx.filter = filterStr;
+                        ctx.drawImage(offscreen, 0, 0);
+                        ctx.restore();
+                        filterRendered = true;
+                    } catch (err) {
+                        filterRendered = false;
+                        ctx.drawImage(offscreen, 0, 0);
+                    }
+
+                    // Apply authentic analog finishing
+                    this.applyAnalogFinishing(ctx, outputWidth, outputHeight, false, this.currentPreset, !filterRendered);
 
                     const imageData = canvas.toDataURL('image/jpeg', 0.90);
                     await this.uploadPhotoData(imageData);
@@ -878,52 +918,36 @@ function disposableCamera(config) {
             }
         },
 
-        // 7 Authentic Analog Film Stock Tone Recipes
-        applyDisposableFilter(ctx, width, height, flashOn, preset = this.currentPreset) {
+        // Authentic Analog Film Finishing: Flash, Film Grain, Vignette & Quartz Date Stamp
+        applyAnalogFinishing(ctx, width, height, flashOn, preset = this.currentPreset, needsFallbackColor = false) {
             const imgData = ctx.getImageData(0, 0, width, height);
             const data = imgData.data;
 
-            let contrast = 1.26;
-            let grainStrength = 32;
-            let vignetteStrength = 0.32;
-            let dateColor = '#FFAA33';
+            let grainStrength = 28;
+            let vignetteStrength = this.getVignetteOpacity();
+            let dateColor = this.getDateColor();
 
             switch (preset) {
                 case 'kodak_funsaver':
-                    contrast = 1.28;
-                    grainStrength = 40; // Gritty ISO 800
-                    dateColor = '#FF7700'; // Deep Amber
+                    grainStrength = 36;
                     break;
                 case 'warm_portra':
-                    contrast = 1.14; // Gentle fine art rolloff
-                    grainStrength = 22; // Silky ISO 400
-                    dateColor = '#FFB866';
+                    grainStrength = 20;
                     break;
                 case 'ilford_bw':
-                    contrast = 1.34; // Deep contrast silver monochrome
-                    grainStrength = 36;
-                    dateColor = '#F4F4F4'; // White Quartz stamp
+                    grainStrength = 32;
                     break;
                 case 'cinestill_800t':
-                    contrast = 1.24;
-                    grainStrength = 34; // ISO 800 cinema grain
-                    dateColor = '#FF4422'; // Neon halation red
+                    grainStrength = 30;
                     break;
                 case 'agfa_vista':
-                    contrast = 1.28; // Punchy 90s snapshot
-                    grainStrength = 26;
-                    dateColor = '#FF8800';
+                    grainStrength = 24;
                     break;
                 case 'lomography_color':
-                    contrast = 1.30;
-                    grainStrength = 34;
-                    vignetteStrength = 0.46; // Heavy toy camera vignette
-                    dateColor = '#FF5500';
+                    grainStrength = 32;
                     break;
-                default: // fuji_quicksnap
-                    contrast = 1.26;
-                    grainStrength = 30;
-                    dateColor = '#FFAA33';
+                default:
+                    grainStrength = 26;
                     break;
             }
 
@@ -942,92 +966,43 @@ function disposableCamera(config) {
                     const ny = (py - height / 2) / (height / 2);
                     const centerDist = Math.hypot(nx, ny);
                     const flashFactor = Math.max(0, 1 - centerDist * 0.78);
-                    r += flashFactor * 46;
-                    g += flashFactor * 44;
-                    b += flashFactor * 38;
+                    r = Math.min(255, r + flashFactor * 46);
+                    g = Math.min(255, g + flashFactor * 44);
+                    b = Math.min(255, b + flashFactor * 38);
                 }
 
-                // Preset-specific Color Matrix Shifting
-                if (preset === 'ilford_bw') {
-                    // Monochrome Luminance
-                    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-                    let nl = luma / 255;
-                    nl = Math.pow(nl, 0.92);
-                    nl = (nl - 0.5) * contrast + 0.5;
-                    r = g = b = nl * 255;
-                } else {
-                    if (preset === 'kodak_funsaver') {
-                        // Golden amber shift
-                        r += 10;
-                        g += 4;
-                        b = Math.max(0, b - 10);
-                    } else if (preset === 'warm_portra') {
-                        // Soft peach skin tones
-                        r += 6;
-                        g += 2;
-                        b = Math.max(0, b - 4);
-                    } else if (preset === 'cinestill_800t') {
+                // If browser did not support ctx.filter, apply fallback math
+                if (needsFallbackColor) {
+                    if (preset === 'ilford_bw') {
                         const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-                        if (luma < 120) {
-                            // Tungsten cool teal shadows
-                            b = Math.min(255, b + 14);
-                            g = Math.min(255, g + 4);
-                            r = Math.max(0, r - 6);
-                        } else {
-                            // Warm red halation on lights
-                            r = Math.min(255, r + 12);
-                            g = Math.min(255, g + 2);
-                        }
-                    } else if (preset === 'agfa_vista') {
-                        // Punchy primary saturation
-                        r = r * 1.06 + 4;
-                        b = b * 1.04 + 2;
-                    } else if (preset === 'lomography_color') {
-                        // Cross-process tint
-                        r = Math.min(255, r * 1.05 + 6);
-                        b = Math.min(255, b * 1.08 + 4);
-                    }
-
-                    // S-Curve Contrast & White Pop
-                    let nr = r / 255;
-                    let ng = g / 255;
-                    let nb = b / 255;
-
-                    nr = Math.pow(nr, 0.90);
-                    ng = Math.pow(ng, 0.90);
-                    nb = Math.pow(nb, 0.94);
-
-                    nr = (nr - 0.5) * contrast + 0.5;
-                    ng = (ng - 0.5) * contrast + 0.5;
-                    nb = (nb - 0.5) * contrast + 0.5;
-
-                    r = nr * 255 + 4;
-                    g = ng * 255 + 4;
-                    b = nb * 255 + 4;
-
-                    // High Whites / Creamy highlights
-                    if (r > 165) {
-                        r = Math.min(255, r * 1.08 + 10);
-                        g = Math.min(255, g * 1.06 + 8);
-                    }
-
-                    // Shadow character
-                    if (r < 75) {
-                        if (preset === 'fuji_quicksnap') {
-                            g = Math.max(8, g * 0.98 + 4); // Emerald shadow
-                        }
-                        r = Math.max(5, r * 0.95);
+                        let nl = (luma / 255 - 0.5) * 1.35 + 0.5;
+                        r = g = b = Math.max(0, Math.min(255, nl * 255 * 0.96));
+                    } else if (preset === 'kodak_funsaver') {
+                        const tr = (0.393 * r + 0.769 * g + 0.189 * b) * 0.24 + r * 0.76;
+                        const tg = (0.349 * r + 0.686 * g + 0.168 * b) * 0.24 + g * 0.76;
+                        const tb = (0.272 * r + 0.534 * g + 0.131 * b) * 0.24 + b * 0.76;
+                        r = Math.min(255, tr * 1.02);
+                        g = Math.min(255, tg * 1.01);
+                        b = Math.max(0, tb * 0.94);
                     }
                 }
 
-                // Film Grain Simulation
+                // Authentic Analog Film Grain
                 const luma = 0.299 * r + 0.587 * g + 0.114 * b;
                 const grainLumaFactor = (1 - Math.abs(luma - 128) / 140) * 0.9 + 0.3;
                 const grain = (Math.random() - 0.5) * grainStrength * grainLumaFactor;
 
-                data[i] = Math.max(0, Math.min(255, r + grain));
-                data[i + 1] = Math.max(0, Math.min(255, g + (preset === 'ilford_bw' ? grain : grain * 0.94)));
-                data[i + 2] = Math.max(0, Math.min(255, b + (preset === 'ilford_bw' ? grain : grain * 0.88)));
+                if (preset === 'ilford_bw') {
+                    // Strictly monochrome grain: equal noise across R, G, B ensures pure black & white
+                    const monoVal = Math.max(0, Math.min(255, luma + grain));
+                    data[i] = monoVal;
+                    data[i + 1] = monoVal;
+                    data[i + 2] = monoVal;
+                } else {
+                    data[i] = Math.max(0, Math.min(255, r + grain));
+                    data[i + 1] = Math.max(0, Math.min(255, g + grain * 0.96));
+                    data[i + 2] = Math.max(0, Math.min(255, b + grain * 0.92));
+                }
             }
             ctx.putImageData(imgData, 0, 0);
 
