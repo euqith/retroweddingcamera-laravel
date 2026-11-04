@@ -177,8 +177,34 @@ class AdminController extends Controller
      */
     public function deletePhoto(Photo $photo)
     {
+        $shotNumber = $photo->shot_number;
         $photo->delete();
-        return back()->with('success', "Foto berhasil dihapus.");
+
+        if (request()->wantsJson()) {
+            return response()->json(['success' => true, 'message' => "Foto #{$shotNumber} berhasil dihapus."]);
+        }
+
+        return back()->with('success', "Foto #{$shotNumber} berhasil dihapus permanen dari server.");
+    }
+
+    /**
+     * Delete all photos for a specific event
+     */
+    public function clearEventPhotos(Event $event)
+    {
+        $count = $event->photos()->count();
+        foreach ($event->photos as $photo) {
+            $photo->delete();
+        }
+
+        // Also clean the directory on server disk
+        \Illuminate\Support\Facades\Storage::disk('public')->deleteDirectory("photos/{$event->slug}");
+        $diskPath = storage_path('app/public/photos/' . $event->slug);
+        if (\Illuminate\Support\Facades\File::isDirectory($diskPath)) {
+            \Illuminate\Support\Facades\File::deleteDirectory($diskPath);
+        }
+
+        return back()->with('success', "Seluruh {$count} foto pada event '{$event->title}' berhasil dihapus bersih dari server.");
     }
 }
 

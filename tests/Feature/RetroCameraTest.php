@@ -197,5 +197,52 @@ class RetroCameraTest extends TestCase
         $this->assertDatabaseMissing('events', ['id' => $this->event->id]);
         $this->assertDatabaseMissing('photos', ['id' => $photo->id]);
     }
+
+    public function test_admin_can_delete_single_photo(): void
+    {
+        $dummyBase64 = 'data:image/png;base64,' . base64_encode(
+            imagepng(imagecreatetruecolor(50, 50)) ? ob_get_clean() : ''
+        );
+
+        $this->postJson('/e/daniel-clara/camera/capture', [
+            'image' => $dummyBase64,
+            'camera_facing' => 'environment',
+            'flash_enabled' => false,
+        ]);
+
+        $photo = Photo::first();
+        $this->assertNotNull($photo);
+        Storage::disk('public')->assertExists($photo->file_path);
+
+        // Delete photo
+        $response = $this->delete("/admin/photos/{$photo->id}");
+        $response->assertRedirect();
+
+        $this->assertDatabaseMissing('photos', ['id' => $photo->id]);
+        Storage::disk('public')->assertMissing($photo->file_path);
+        Storage::disk('public')->assertMissing($photo->thumbnail_path);
+    }
+
+    public function test_admin_can_clear_all_event_photos(): void
+    {
+        $dummyBase64 = 'data:image/png;base64,' . base64_encode(
+            imagepng(imagecreatetruecolor(50, 50)) ? ob_get_clean() : ''
+        );
+
+        $this->postJson('/e/daniel-clara/camera/capture', [
+            'image' => $dummyBase64,
+            'camera_facing' => 'environment',
+            'flash_enabled' => false,
+        ]);
+
+        $this->assertDatabaseCount('photos', 1);
+
+        // Clear all photos
+        $response = $this->post("/admin/events/{$this->event->id}/gallery/clear");
+        $response->assertRedirect();
+
+        $this->assertDatabaseCount('photos', 0);
+        $this->assertEmpty(Storage::disk('public')->allFiles("photos/daniel-clara"));
+    }
 }
 

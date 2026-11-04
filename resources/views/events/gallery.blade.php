@@ -12,6 +12,20 @@
     }"
     class="min-h-screen bg-[#FAF6F0] pb-24">
 
+    @auth
+        <!-- Admin Bar Overlay -->
+        <div class="bg-wedding-dark text-white text-xs py-2 px-4 flex items-center justify-between border-b border-wedding-gold/30">
+            <div class="flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="text-white/90">Mode Admin Aktif ({{ Auth::user()->name }}). Anda dapat menghapus foto langsung dari galeri ini.</span>
+            </div>
+            <a href="{{ route('admin.dashboard') }}" class="text-wedding-gold hover:underline font-semibold text-[11px] flex items-center space-x-1">
+                <span>Dashboard Admin</span>
+                <span>→</span>
+            </a>
+        </div>
+    @endauth
+
     <!-- Top Sticky Header -->
     <header class="sticky top-0 bg-[#FAF6F0]/95 backdrop-blur-md border-b border-wedding-gold/20 z-30 px-4 py-3 sm:py-4">
         <div class="max-w-4xl mx-auto flex items-center justify-between">
@@ -98,7 +112,24 @@
                         <!-- Card Footer -->
                         <div class="mt-2 px-1 flex items-center justify-between text-[11px] text-wedding-subtle">
                             <span class="font-mono font-semibold text-wedding-dark">#{{ $photo->shot_number }}</span>
-                            <span>{{ $photo->taken_at->format('H:i') }}</span>
+                            <div class="flex items-center space-x-1.5">
+                                <span>{{ $photo->taken_at->format('H:i') }}</span>
+                                @auth
+                                    <form action="{{ route('admin.photos.destroy', $photo) }}" method="POST"
+                                          onclick="event.stopPropagation();"
+                                          onsubmit="event.stopPropagation(); return confirm('⚠️ Hapus foto #{{ $photo->shot_number }} ini permanen dari server?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit"
+                                                class="p-1 rounded bg-red-50 hover:bg-red-600 text-red-500 hover:text-white transition-colors"
+                                                title="Hapus Foto (Admin)">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                @endauth
+                            </div>
                         </div>
                     </div>
                 @endforeach
@@ -166,6 +197,21 @@
                 </div>
 
                 <div class="flex items-center space-x-2">
+                    @auth
+                        <form :action="'/admin/photos/' + (selectedPhoto ? selectedPhoto.id : '')" method="POST"
+                              onsubmit="return confirm('⚠️ Hapus foto ini permanen dari galeri dan server?');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit"
+                                    class="py-2 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-xs flex items-center space-x-1.5 transition-colors shadow">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                                </svg>
+                                <span>Hapus Foto (Admin)</span>
+                            </button>
+                        </form>
+                    @endauth
+
                     <a :href="selectedPhoto ? selectedPhoto.url : '#'"
                        download
                        class="py-2 px-4 rounded-xl bg-wedding-dark hover:bg-wedding-dark/90 text-white font-medium text-xs flex items-center space-x-1.5 transition-colors">

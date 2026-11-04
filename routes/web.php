@@ -42,13 +42,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
     // Separated Event Photo Gallery Manager
     Route::get('/events/{event}/gallery', [AdminController::class, 'gallery'])->name('events.gallery');
+    Route::post('/events/{event}/gallery/clear', [AdminController::class, 'clearEventPhotos'])->name('events.gallery.clear');
 
     // Device Sessions & Roll Reset
     Route::get('/events/{event}/sessions', [AdminController::class, 'sessions'])->name('events.sessions');
     Route::post('/events/{event}/sessions/reset-all', [AdminController::class, 'resetAllSessions'])->name('events.sessions.reset-all');
     Route::post('/sessions/{session}/reset', [AdminController::class, 'resetSession'])->name('sessions.reset');
 
-    // Photo moderation
+    // Photo moderation (Delete single photo)
     Route::delete('/photos/{photo}', [AdminController::class, 'deletePhoto'])->name('photos.destroy');
 
     // Storage link runner and auto-repair for shared hosting (Hostinger/cPanel)
