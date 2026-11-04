@@ -76,3 +76,4 @@ class Event extends Model
         return url('/e/' . $this->slug . '/gallery');
     }
 }
+

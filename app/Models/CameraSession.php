@@ -64,3 +64,4 @@ class CameraSession extends Model
         }
     }
 }
+

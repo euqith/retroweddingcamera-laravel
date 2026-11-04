@@ -152,3 +152,4 @@ class RetroCameraTest extends TestCase
         $response->assertSee('Buka Galeri Foto');
     }
 }
+
