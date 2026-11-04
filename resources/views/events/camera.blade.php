@@ -170,12 +170,23 @@
                     </button>
                 </div>
 
-                <!-- Processing Spinner -->
-                <div x-show="isProcessing"
-                     class="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center text-white z-20"
+                <!-- Optical Mechanical Shutter Blink Effect -->
+                <div x-show="isShutterBlinking"
+                     class="absolute inset-0 bg-white z-30 pointer-events-none transition-opacity duration-100"
+                     style="display: none;"></div>
+
+                <!-- Non-blocking Vintage Developing Indicator -->
+                <div x-show="isDeveloping"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 -translate-y-2 scale-95"
+                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                     x-transition:leave="transition ease-in duration-200"
+                     x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                     x-transition:leave-end="opacity-0 -translate-y-2 scale-95"
+                     class="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/85 backdrop-blur-md border border-wedding-gold/60 text-wedding-gold text-[10px] font-mono font-bold flex items-center space-x-2 shadow-xl z-20 pointer-events-none"
                      style="display: none;">
-                    <div class="w-8 h-8 border-2 border-wedding-gold border-t-transparent rounded-full animate-spin mb-2"></div>
-                    <span class="text-[11px] tracking-widest uppercase font-mono text-wedding-gold">Developing Film...</span>
+                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                    <span x-text="statusMessage || '🎞️ Developing Film...'"></span>
                 </div>
             </div>
 
@@ -242,8 +253,9 @@
                 <!-- Big Shutter Button -->
                 <div class="flex flex-col items-center">
                     <button @click="takePhoto()"
-                            :disabled="isRollEmpty || isProcessing"
-                            class="w-16 h-16 rounded-full shutter-btn border-4 border-[#3f3f46] flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                            :disabled="isRollEmpty || isShutterCooldown"
+                            class="w-16 h-16 rounded-full shutter-btn border-4 border-[#3f3f46] flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 active:shadow-inner"
+                            :class="isShutterCooldown ? 'opacity-70 scale-95' : ''">
                         <div class="w-10 h-10 rounded-full border border-white/20"></div>
                     </button>
                     <span class="text-[9px] uppercase tracking-wider text-wedding-dark/60 font-semibold mt-1">Shutter</span>
@@ -558,22 +570,27 @@ function disposableCamera(config) {
         flashEnabled: false,
         isFlashing: false,
         isProcessing: false,
+        isDeveloping: false,
+        statusMessage: '',
+        isShutterBlinking: false,
+        isShutterCooldown: false,
         cameraError: null,
         stream: null,
         audioCtx: null,
         _noiseCanvas: null,
 
-        // High-performance 256x256 authentic film grain tile (generated once in <1ms)
+        // Authentic analog film grain tile centered at neutral mid-gray (128)
+        // In overlay blend mode, 128 is 100% transparent and preserves rich contrast & saturation without milky haze
         getNoisePattern(ctx) {
             if (!this._noiseCanvas) {
                 const nc = document.createElement('canvas');
-                nc.width = 256;
-                nc.height = 256;
+                nc.width = 128;
+                nc.height = 128;
                 const nctx = nc.getContext('2d');
-                const imgData = nctx.createImageData(256, 256);
+                const imgData = nctx.createImageData(128, 128);
                 const data = imgData.data;
                 for (let i = 0; i < data.length; i += 4) {
-                    const v = (Math.random() * 255) | 0;
+                    const v = (128 + (Math.random() - 0.5) * 64) | 0;
                     data[i] = v;
                     data[i + 1] = v;
                     data[i + 2] = v;
@@ -711,14 +728,20 @@ function disposableCamera(config) {
         },
 
         async takePhoto() {
-            if (this.isRollEmpty || this.isProcessing) return;
+            if (this.isRollEmpty || this.isShutterCooldown) return;
 
             if (!this.stream || this.cameraError) {
                 this.triggerNativeCamera();
                 return;
             }
 
-            this.isProcessing = true;
+            // Quick 400ms shutter cooldown (feels mechanical, prevents accidental double taps)
+            this.isShutterCooldown = true;
+            setTimeout(() => { this.isShutterCooldown = false; }, 400);
+
+            // Optical shutter mechanical blink (90ms)
+            this.isShutterBlinking = true;
+            setTimeout(() => { this.isShutterBlinking = false; }, 90);
 
             try {
                 this.playShutterSound();
@@ -742,6 +765,14 @@ function disposableCamera(config) {
                 if (navigator.vibrate) {
                     navigator.vibrate(50);
                 }
+
+                // Non-blocking developing badge indicator
+                this.isDeveloping = true;
+                this.statusMessage = '🎞️ Developing Film...';
+
+                // Optimistic film counter advance (mechanical roll feel!)
+                const pendingShotNumber = this.shotsTaken + 1;
+                this.shotsTaken = pendingShotNumber;
 
                 const video = this.$refs.videoElement;
                 const canvas = this.$refs.captureCanvas;
@@ -785,7 +816,7 @@ function disposableCamera(config) {
                 offCtx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, outputWidth, outputHeight);
                 offCtx.restore();
 
-                // 2. Render from offscreen to main canvas with the EXACT CSS film filter used by viewfinder
+                // 2. Render from offscreen to main canvas
                 const filterStr = this.getFilterString(this.currentPreset);
 
                 try {
@@ -814,10 +845,11 @@ function disposableCamera(config) {
                 this.applyAnalogFinishing(ctx, outputWidth, outputHeight, this.flashEnabled, this.currentPreset);
 
                 const imageData = canvas.toDataURL('image/jpeg', 0.85);
-                await this.uploadPhotoData(imageData);
+                await this.uploadPhotoData(imageData, pendingShotNumber);
             } catch (err) {
                 console.error('takePhoto error:', err);
                 alert('Gagal mengambil foto: ' + (err.message || 'Terjadi kesalahan sistem'));
+                this.isDeveloping = false;
                 this.isProcessing = false;
             }
         },
@@ -826,12 +858,13 @@ function disposableCamera(config) {
             const file = event.target.files[0];
             if (!file) return;
 
-            this.isProcessing = true;
+            this.isDeveloping = true;
+            this.statusMessage = '🎞️ Memproses Foto...';
             this.playShutterSound();
 
             const reader = new FileReader();
             reader.onerror = () => {
-                this.isProcessing = false;
+                this.isDeveloping = false;
                 alert('Gagal membaca file foto dari galeri/kamera HP.');
                 event.target.value = '';
             };
@@ -839,13 +872,16 @@ function disposableCamera(config) {
             reader.onload = (e) => {
                 const img = new Image();
                 img.onerror = () => {
-                    this.isProcessing = false;
+                    this.isDeveloping = false;
                     alert('Format gambar tidak dapat diproses.');
                     event.target.value = '';
                 };
 
                 img.onload = async () => {
                     try {
+                        const pendingShotNumber = this.shotsTaken + 1;
+                        this.shotsTaken = pendingShotNumber;
+
                         const canvas = this.$refs.captureCanvas;
                         const ctx = canvas.getContext('2d');
 
@@ -895,11 +931,11 @@ function disposableCamera(config) {
                         this.applyAnalogFinishing(ctx, outputWidth, outputHeight, false, this.currentPreset);
 
                         const imageData = canvas.toDataURL('image/jpeg', 0.85);
-                        await this.uploadPhotoData(imageData);
+                        await this.uploadPhotoData(imageData, pendingShotNumber);
                     } catch (err) {
                         console.error('handleNativePhoto error:', err);
                         alert('Gagal memproses foto.');
-                        this.isProcessing = false;
+                        this.isDeveloping = false;
                     } finally {
                         event.target.value = '';
                     }
@@ -909,7 +945,7 @@ function disposableCamera(config) {
             reader.readAsDataURL(file);
         },
 
-        async uploadPhotoData(imageData) {
+        async uploadPhotoData(imageData, targetShotNumber) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s safety network timeout
 
@@ -938,14 +974,14 @@ function disposableCamera(config) {
                         const errData = await response.json();
                         if (errData && errData.message) errorMsg = errData.message;
                     } catch (e) {}
-                    alert(errorMsg);
-                    return;
+                    throw new Error(errorMsg);
                 }
 
                 const data = await response.json();
 
                 if (data.success) {
                     this.shotsTaken = data.shots_taken;
+                    this.statusMessage = '✓ Foto #' + data.shots_taken + ' Tersimpan!';
 
                     // Add new photo to local myPhotos roll
                     if (data.photo) {
@@ -957,22 +993,30 @@ function disposableCamera(config) {
                             taken_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         });
                     }
+
+                    setTimeout(() => {
+                        this.isDeveloping = false;
+                    }, 1400);
                 } else {
-                    alert(data.message || 'Gagal menyimpan foto.');
+                    throw new Error(data.message || 'Gagal menyimpan foto.');
                 }
             } catch (error) {
                 clearTimeout(timeoutId);
                 console.error('Upload foto error:', error);
+                
+                // Revert optimistic shot count if needed
+                if (targetShotNumber && this.shotsTaken >= targetShotNumber) {
+                    this.shotsTaken--;
+                }
+                this.isDeveloping = false;
+
                 if (error.name === 'AbortError') {
                     alert('Waktu koneksi habis saat mengirim foto ke server. Periksa koneksi internet Anda dan coba lagi.');
                 } else {
-                    alert('Terjadi kesalahan saat memproses foto. Silakan coba lagi.');
+                    alert(error.message || 'Terjadi kesalahan saat memproses foto. Silakan coba lagi.');
                 }
             } finally {
-                // Guarantee developing film spinner ALWAYS disappears promptly!
-                setTimeout(() => {
-                    this.isProcessing = false;
-                }, 300);
+                this.isProcessing = false;
             }
         },
 
@@ -995,16 +1039,16 @@ function disposableCamera(config) {
                 ctx.restore();
             }
 
-            // 2. Authentic 35mm Analog Film Grain (GPU Pattern Tile Blending)
-            let grainAlpha = 0.18;
+            // 2. Subtle Authentic 35mm Analog Film Grain (Centered at 128 mid-gray, no milky wash)
+            let grainAlpha = 0.09;
             switch (preset) {
-                case 'kodak_funsaver': grainAlpha = 0.26; break;
-                case 'warm_portra': grainAlpha = 0.14; break;
-                case 'ilford_bw': grainAlpha = 0.28; break;
-                case 'cinestill_800t': grainAlpha = 0.22; break;
-                case 'agfa_vista': grainAlpha = 0.18; break;
-                case 'lomography_color': grainAlpha = 0.25; break;
-                default: grainAlpha = 0.18; break;
+                case 'kodak_funsaver': grainAlpha = 0.12; break;
+                case 'warm_portra': grainAlpha = 0.07; break;
+                case 'ilford_bw': grainAlpha = 0.14; break;
+                case 'cinestill_800t': grainAlpha = 0.10; break;
+                case 'agfa_vista': grainAlpha = 0.09; break;
+                case 'lomography_color': grainAlpha = 0.11; break;
+                default: grainAlpha = 0.09; break;
             }
 
             try {

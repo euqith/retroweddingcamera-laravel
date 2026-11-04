@@ -124,12 +124,14 @@ class EventController extends Controller
         ]);
 
         $shotNumber = $session->shots_taken + 1;
+        $filterApplied = $request->input('filter_applied') ?: ($event->filter_preset ?? 'fuji_quicksnap');
 
-        // Process and store the image using Intervention Image in event slug folder
+        // Process and store the image using Intervention Image with authentic 35mm film curve
         $stored = $imageService->storeCapturedPhoto(
             $request->input('image'),
             $event->slug,
-            $shotNumber
+            $shotNumber,
+            $filterApplied
         );
 
         $photo = Photo::create([
@@ -140,7 +142,7 @@ class EventController extends Controller
             'thumbnail_path' => $stored['thumbnail_path'],
             'camera_facing' => $request->input('camera_facing', 'environment'),
             'flash_enabled' => (bool) $request->input('flash_enabled', false),
-            'filter_applied' => $request->input('filter_applied') ?: ($event->filter_preset ?? 'fuji_quicksnap'),
+            'filter_applied' => $filterApplied,
             'caption' => $request->input('caption'),
             'is_visible' => true,
             'taken_at' => now(),

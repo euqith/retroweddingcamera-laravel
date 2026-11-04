@@ -22,9 +22,15 @@ class ImageProcessingService
      * @param string $imageData Base64 encoded, Data URI, or raw binary string
      * @param string|int $eventIdentifier Event slug or name (or legacy id)
      * @param int $shotNumber
+     * @param string $filterPreset
      * @return array [file_path, thumbnail_path]
      */
-    public function storeCapturedPhoto(string $imageData, string|int $eventIdentifier, int $shotNumber): array
+    public function storeCapturedPhoto(
+        string $imageData,
+        string|int $eventIdentifier,
+        int $shotNumber,
+        string $filterPreset = 'fuji_quicksnap'
+    ): array
     {
         // Decode image using Intervention Image v4
         if (str_starts_with($imageData, 'data:image')) {
@@ -35,6 +41,9 @@ class ImageProcessingService
             $binary = ($decoded !== false && base64_encode($decoded) === $imageData) ? $decoded : $imageData;
             $image = $this->manager->decode($binary);
         }
+
+        // Apply authentic 35mm analog film simulation curves
+        $this->applyFilmPreset($image, $filterPreset);
 
         $uuid = Str::uuid()->toString();
         $filename = "shot_{$shotNumber}_{$uuid}.jpg";
@@ -61,5 +70,62 @@ class ImageProcessingService
             'file_path' => $mainPath,
             'thumbnail_path' => $thumbPath,
         ];
+    }
+
+    /**
+     * Apply authentic 35mm film stock simulation curves.
+     * Guaranteed consistent across all mobile devices & browsers (iOS Safari, Android Chrome, etc.)
+     */
+    public function applyFilmPreset($image, string $preset): void
+    {
+        switch ($preset) {
+            case 'lomography_color':
+                // Rich cross-process toy camera: punchy contrast, deep saturated warm amber/orange-brown, rich shadows
+                $image->contrast(28);
+                $image->colorize(16, 4, -18);
+                $image->gamma(0.90);
+                break;
+
+            case 'kodak_funsaver':
+                // Warm golden amber, rich tone rolloff (ISO 800)
+                $image->contrast(20);
+                $image->colorize(16, 8, -12);
+                $image->brightness(2);
+                $image->gamma(0.96);
+                break;
+
+            case 'warm_portra':
+                // Soft pastel wedding skin tones, gentle creamy rolloff (Portra 400)
+                $image->contrast(12);
+                $image->colorize(8, 4, -4);
+                $image->gamma(1.02);
+                break;
+
+            case 'ilford_bw':
+                // Classic silver gelatin high-contrast black & white (HP5 Plus 400)
+                $image->grayscale();
+                $image->contrast(32);
+                break;
+
+            case 'cinestill_800t':
+                // Cinema tungsten: cool teal-blue shadows with warm amber highlights
+                $image->contrast(22);
+                $image->colorize(-8, 4, 18);
+                $image->gamma(0.95);
+                break;
+
+            case 'agfa_vista':
+                // Vibrant 90s party snapshot, punchy primary saturation
+                $image->contrast(24);
+                $image->colorize(12, 0, -6);
+                break;
+
+            case 'fuji_quicksnap':
+            default:
+                // Clean emerald shadows, crisp whites pop
+                $image->contrast(20);
+                $image->colorize(-2, 8, -4);
+                break;
+        }
     }
 }

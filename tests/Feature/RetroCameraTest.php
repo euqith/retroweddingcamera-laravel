@@ -94,6 +94,26 @@ class RetroCameraTest extends TestCase
         ]);
     }
 
+    public function test_guest_can_capture_with_lomography_film_preset(): void
+    {
+        $dummyBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+        $response = $this->postJson('/e/daniel-clara/camera/capture', [
+            'image' => $dummyBase64,
+            'camera_facing' => 'environment',
+            'flash_enabled' => false,
+            'filter_applied' => 'lomography_color',
+        ], [
+            'X-Device-Token' => 'LOMO-DEVICE-01',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('photos', [
+            'event_id' => $this->event->id,
+            'filter_applied' => 'lomography_color',
+        ]);
+    }
+
     public function test_guest_cannot_exceed_36_shots_per_device(): void
     {
         // Pre-create session with 36 shots used
