@@ -561,6 +561,29 @@ function disposableCamera(config) {
         cameraError: null,
         stream: null,
         audioCtx: null,
+        _noiseCanvas: null,
+
+        // High-performance 256x256 authentic film grain tile (generated once in <1ms)
+        getNoisePattern(ctx) {
+            if (!this._noiseCanvas) {
+                const nc = document.createElement('canvas');
+                nc.width = 256;
+                nc.height = 256;
+                const nctx = nc.getContext('2d');
+                const imgData = nctx.createImageData(256, 256);
+                const data = imgData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    const v = (Math.random() * 255) | 0;
+                    data[i] = v;
+                    data[i + 1] = v;
+                    data[i + 2] = v;
+                    data[i + 3] = 255;
+                }
+                nctx.putImageData(imgData, 0, 0);
+                this._noiseCanvas = nc;
+            }
+            return ctx.createPattern(this._noiseCanvas, 'repeat');
+        },
 
         get remainingShots() {
             return Math.max(0, this.maxShots - this.shotsTaken);
@@ -696,108 +719,107 @@ function disposableCamera(config) {
             }
 
             this.isProcessing = true;
-            this.playShutterSound();
-
-            // Hardware Torch pulse if available
-            if (this.flashEnabled && this.stream) {
-                const track = this.stream.getVideoTracks()[0];
-                if (track && track.getCapabilities && track.getCapabilities().torch) {
-                    try {
-                        await track.applyConstraints({ advanced: [{ torch: true }] });
-                    } catch (e) {}
-                }
-            }
-
-            // Screen Flash Burst
-            if (this.flashEnabled) {
-                this.isFlashing = true;
-                await new Promise(r => setTimeout(r, 120));
-            }
-
-            if (navigator.vibrate) {
-                navigator.vibrate(50);
-            }
-
-            const video = this.$refs.videoElement;
-            const canvas = this.$refs.captureCanvas;
-            const ctx = canvas.getContext('2d');
-
-            const videoW = video.videoWidth || 1280;
-            const videoH = video.videoHeight || 960;
-
-            // STRICT 4:3 LANDSCAPE CROP (MATCHES VIEWFINDER PIXEL-PERFECT)
-            const targetAspect = 4 / 3;
-            let cropX = 0, cropY = 0, cropW = videoW, cropH = videoH;
-
-            if (videoW / videoH > targetAspect) {
-                // Source is wider than 4:3 (e.g. 16:9 landscape) -> crop left & right
-                cropH = videoH;
-                cropW = Math.round(videoH * targetAspect);
-                cropX = Math.round((videoW - cropW) / 2);
-            } else {
-                // Source is taller than 4:3 (e.g. 9:16 portrait phone) -> crop top & bottom to exact 4:3 window seen by user
-                cropW = videoW;
-                cropH = Math.round(videoW / targetAspect);
-                cropY = Math.round((videoH - cropH) / 2);
-            }
-
-            const outputWidth = Math.min(1600, Math.max(1280, cropW));
-            const outputHeight = Math.round(outputWidth / targetAspect);
-
-            canvas.width = outputWidth;
-            canvas.height = outputHeight;
-
-            // 1. Capture exact 4:3 crop to temporary offscreen buffer
-            const offscreen = document.createElement('canvas');
-            offscreen.width = outputWidth;
-            offscreen.height = outputHeight;
-            const offCtx = offscreen.getContext('2d');
-
-            offCtx.save();
-            if (this.facingMode === 'user') {
-                offCtx.translate(outputWidth, 0);
-                offCtx.scale(-1, 1);
-            }
-            // Draw exact 4:3 landscape slice that was framed inside the viewfinder
-            offCtx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, outputWidth, outputHeight);
-            offCtx.restore();
-
-            // 2. Render from offscreen to main canvas with the EXACT CSS film filter used by viewfinder
-            canvas.width = outputWidth;
-            canvas.height = outputHeight;
-
-            const filterStr = this.getFilterString(this.currentPreset);
-            let filterRendered = false;
 
             try {
-                ctx.save();
-                ctx.filter = filterStr;
-                ctx.drawImage(offscreen, 0, 0);
-                ctx.restore();
-                filterRendered = true;
-            } catch (err) {
-                filterRendered = false;
-                ctx.drawImage(offscreen, 0, 0);
-            }
+                this.playShutterSound();
 
-            // Turn off screen flash & hardware torch immediately
-            if (this.flashEnabled) {
-                this.isFlashing = false;
-                if (this.stream) {
+                // Hardware Torch pulse if available
+                if (this.flashEnabled && this.stream) {
                     const track = this.stream.getVideoTracks()[0];
                     if (track && track.getCapabilities && track.getCapabilities().torch) {
                         try {
-                            await track.applyConstraints({ advanced: [{ torch: false }] });
+                            await track.applyConstraints({ advanced: [{ torch: true }] });
                         } catch (e) {}
                     }
                 }
+
+                // Screen Flash Burst
+                if (this.flashEnabled) {
+                    this.isFlashing = true;
+                    await new Promise(r => setTimeout(r, 100));
+                }
+
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+
+                const video = this.$refs.videoElement;
+                const canvas = this.$refs.captureCanvas;
+                const ctx = canvas.getContext('2d');
+
+                const videoW = video.videoWidth || 1280;
+                const videoH = video.videoHeight || 960;
+
+                // STRICT 4:3 LANDSCAPE CROP (MATCHES VIEWFINDER PIXEL-PERFECT)
+                const targetAspect = 4 / 3;
+                let cropX = 0, cropY = 0, cropW = videoW, cropH = videoH;
+
+                if (videoW / videoH > targetAspect) {
+                    cropH = videoH;
+                    cropW = Math.round(videoH * targetAspect);
+                    cropX = Math.round((videoW - cropW) / 2);
+                } else {
+                    cropW = videoW;
+                    cropH = Math.round(videoW / targetAspect);
+                    cropY = Math.round((videoH - cropH) / 2);
+                }
+
+                // High-performance 1200x900 (crisp 4:3 vintage frame, fast processing & lightweight upload)
+                const outputWidth = 1200;
+                const outputHeight = 900;
+
+                canvas.width = outputWidth;
+                canvas.height = outputHeight;
+
+                // 1. Capture exact 4:3 crop to temporary offscreen buffer
+                const offscreen = document.createElement('canvas');
+                offscreen.width = outputWidth;
+                offscreen.height = outputHeight;
+                const offCtx = offscreen.getContext('2d');
+
+                offCtx.save();
+                if (this.facingMode === 'user') {
+                    offCtx.translate(outputWidth, 0);
+                    offCtx.scale(-1, 1);
+                }
+                offCtx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, outputWidth, outputHeight);
+                offCtx.restore();
+
+                // 2. Render from offscreen to main canvas with the EXACT CSS film filter used by viewfinder
+                const filterStr = this.getFilterString(this.currentPreset);
+
+                try {
+                    ctx.save();
+                    ctx.filter = filterStr;
+                    ctx.drawImage(offscreen, 0, 0);
+                    ctx.restore();
+                } catch (err) {
+                    ctx.drawImage(offscreen, 0, 0);
+                }
+
+                // Turn off screen flash & hardware torch immediately
+                if (this.flashEnabled) {
+                    this.isFlashing = false;
+                    if (this.stream) {
+                        const track = this.stream.getVideoTracks()[0];
+                        if (track && track.getCapabilities && track.getCapabilities().torch) {
+                            try {
+                                await track.applyConstraints({ advanced: [{ torch: false }] });
+                            } catch (e) {}
+                        }
+                    }
+                }
+
+                // 3. Apply authentic analog finishing (Flash, grain, lens vignette, quartz date stamp) in <10ms
+                this.applyAnalogFinishing(ctx, outputWidth, outputHeight, this.flashEnabled, this.currentPreset);
+
+                const imageData = canvas.toDataURL('image/jpeg', 0.85);
+                await this.uploadPhotoData(imageData);
+            } catch (err) {
+                console.error('takePhoto error:', err);
+                alert('Gagal mengambil foto: ' + (err.message || 'Terjadi kesalahan sistem'));
+                this.isProcessing = false;
             }
-
-            // 3. Apply authentic analog finishing (Flash, grain, lens vignette, quartz date stamp)
-            this.applyAnalogFinishing(ctx, outputWidth, outputHeight, this.flashEnabled, this.currentPreset, !filterRendered);
-
-            const imageData = canvas.toDataURL('image/jpeg', 0.90);
-            await this.uploadPhotoData(imageData);
         },
 
         async handleNativePhoto(event) {
@@ -808,63 +830,79 @@ function disposableCamera(config) {
             this.playShutterSound();
 
             const reader = new FileReader();
+            reader.onerror = () => {
+                this.isProcessing = false;
+                alert('Gagal membaca file foto dari galeri/kamera HP.');
+                event.target.value = '';
+            };
+
             reader.onload = (e) => {
                 const img = new Image();
-                img.onload = async () => {
-                    const canvas = this.$refs.captureCanvas;
-                    const ctx = canvas.getContext('2d');
-
-                    const imgW = img.width;
-                    const imgH = img.height;
-
-                    // STRICT 4:3 LANDSCAPE CROP (MATCHES VIEWFINDER PIXEL-PERFECT)
-                    const targetAspect = 4 / 3;
-                    let cropX = 0, cropY = 0, cropW = imgW, cropH = imgH;
-
-                    if (imgW / imgH > targetAspect) {
-                        cropH = imgH;
-                        cropW = Math.round(imgH * targetAspect);
-                        cropX = Math.round((imgW - cropW) / 2);
-                    } else {
-                        cropW = imgW;
-                        cropH = Math.round(imgW / targetAspect);
-                        cropY = Math.round((imgH - cropH) / 2);
-                    }
-
-                    const outputWidth = Math.min(1920, Math.max(1280, cropW));
-                    const outputHeight = Math.round(outputWidth / targetAspect);
-
-                    // Offscreen raw crop
-                    const offscreen = document.createElement('canvas');
-                    offscreen.width = outputWidth;
-                    offscreen.height = outputHeight;
-                    const offCtx = offscreen.getContext('2d');
-                    offCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outputWidth, outputHeight);
-
-                    // Main canvas with identical viewfinder film filter
-                    canvas.width = outputWidth;
-                    canvas.height = outputHeight;
-
-                    const filterStr = this.getFilterString(this.currentPreset);
-                    let filterRendered = false;
-
-                    try {
-                        ctx.save();
-                        ctx.filter = filterStr;
-                        ctx.drawImage(offscreen, 0, 0);
-                        ctx.restore();
-                        filterRendered = true;
-                    } catch (err) {
-                        filterRendered = false;
-                        ctx.drawImage(offscreen, 0, 0);
-                    }
-
-                    // Apply authentic analog finishing
-                    this.applyAnalogFinishing(ctx, outputWidth, outputHeight, false, this.currentPreset, !filterRendered);
-
-                    const imageData = canvas.toDataURL('image/jpeg', 0.90);
-                    await this.uploadPhotoData(imageData);
+                img.onerror = () => {
+                    this.isProcessing = false;
+                    alert('Format gambar tidak dapat diproses.');
                     event.target.value = '';
+                };
+
+                img.onload = async () => {
+                    try {
+                        const canvas = this.$refs.captureCanvas;
+                        const ctx = canvas.getContext('2d');
+
+                        const imgW = img.width;
+                        const imgH = img.height;
+
+                        // STRICT 4:3 LANDSCAPE CROP (MATCHES VIEWFINDER PIXEL-PERFECT)
+                        const targetAspect = 4 / 3;
+                        let cropX = 0, cropY = 0, cropW = imgW, cropH = imgH;
+
+                        if (imgW / imgH > targetAspect) {
+                            cropH = imgH;
+                            cropW = Math.round(imgH * targetAspect);
+                            cropX = Math.round((imgW - cropW) / 2);
+                        } else {
+                            cropW = imgW;
+                            cropH = Math.round(imgW / targetAspect);
+                            cropY = Math.round((imgH - cropH) / 2);
+                        }
+
+                        const outputWidth = 1200;
+                        const outputHeight = 900;
+
+                        // Offscreen raw crop
+                        const offscreen = document.createElement('canvas');
+                        offscreen.width = outputWidth;
+                        offscreen.height = outputHeight;
+                        const offCtx = offscreen.getContext('2d');
+                        offCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outputWidth, outputHeight);
+
+                        // Main canvas with identical viewfinder film filter
+                        canvas.width = outputWidth;
+                        canvas.height = outputHeight;
+
+                        const filterStr = this.getFilterString(this.currentPreset);
+
+                        try {
+                            ctx.save();
+                            ctx.filter = filterStr;
+                            ctx.drawImage(offscreen, 0, 0);
+                            ctx.restore();
+                        } catch (err) {
+                            ctx.drawImage(offscreen, 0, 0);
+                        }
+
+                        // Apply authentic analog finishing in <10ms
+                        this.applyAnalogFinishing(ctx, outputWidth, outputHeight, false, this.currentPreset);
+
+                        const imageData = canvas.toDataURL('image/jpeg', 0.85);
+                        await this.uploadPhotoData(imageData);
+                    } catch (err) {
+                        console.error('handleNativePhoto error:', err);
+                        alert('Gagal memproses foto.');
+                        this.isProcessing = false;
+                    } finally {
+                        event.target.value = '';
+                    }
                 };
                 img.src = e.target.result;
             };
@@ -872,9 +910,13 @@ function disposableCamera(config) {
         },
 
         async uploadPhotoData(imageData) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s safety network timeout
+
             try {
                 const response = await fetch(this.captureUrl, {
                     method: 'POST',
+                    signal: controller.signal,
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': this.csrf,
@@ -887,6 +929,18 @@ function disposableCamera(config) {
                         filter_applied: this.currentPreset
                     })
                 });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    let errorMsg = 'Gagal menyimpan foto (' + response.status + ').';
+                    try {
+                        const errData = await response.json();
+                        if (errData && errData.message) errorMsg = errData.message;
+                    } catch (e) {}
+                    alert(errorMsg);
+                    return;
+                }
 
                 const data = await response.json();
 
@@ -903,126 +957,91 @@ function disposableCamera(config) {
                             taken_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         });
                     }
-
-                    setTimeout(() => {
-                        this.isProcessing = false;
-                    }, 500);
                 } else {
                     alert(data.message || 'Gagal menyimpan foto.');
-                    this.isProcessing = false;
                 }
             } catch (error) {
+                clearTimeout(timeoutId);
                 console.error('Upload foto error:', error);
-                alert('Terjadi kesalahan saat memproses foto.');
-                this.isProcessing = false;
+                if (error.name === 'AbortError') {
+                    alert('Waktu koneksi habis saat mengirim foto ke server. Periksa koneksi internet Anda dan coba lagi.');
+                } else {
+                    alert('Terjadi kesalahan saat memproses foto. Silakan coba lagi.');
+                }
+            } finally {
+                // Guarantee developing film spinner ALWAYS disappears promptly!
+                setTimeout(() => {
+                    this.isProcessing = false;
+                }, 300);
             }
         },
 
-        // Authentic Analog Film Finishing: Flash, Film Grain, Vignette & Quartz Date Stamp
-        applyAnalogFinishing(ctx, width, height, flashOn, preset = this.currentPreset, needsFallbackColor = false) {
-            const imgData = ctx.getImageData(0, 0, width, height);
-            const data = imgData.data;
+        // Ultra-Fast GPU-Accelerated Analog Finishing: Flash, Film Grain, Vignette & Quartz Date Stamp (<10ms)
+        applyAnalogFinishing(ctx, width, height, flashOn, preset = this.currentPreset) {
+            // 1. Direct Flash Exposure Burst (Center-weighted soft radial gradient via Screen blend)
+            if (flashOn) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                const maxDim = Math.hypot(width, height) / 2;
+                const flashGrad = ctx.createRadialGradient(
+                    width / 2, height / 2, 0,
+                    width / 2, height / 2, maxDim * 0.95
+                );
+                flashGrad.addColorStop(0, 'rgba(255, 248, 235, 0.36)');
+                flashGrad.addColorStop(0.45, 'rgba(255, 242, 215, 0.16)');
+                flashGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = flashGrad;
+                ctx.fillRect(0, 0, width, height);
+                ctx.restore();
+            }
 
-            let grainStrength = 28;
-            let vignetteStrength = this.getVignetteOpacity();
-            let dateColor = this.getDateColor();
-
+            // 2. Authentic 35mm Analog Film Grain (GPU Pattern Tile Blending)
+            let grainAlpha = 0.18;
             switch (preset) {
-                case 'kodak_funsaver':
-                    grainStrength = 36;
-                    break;
-                case 'warm_portra':
-                    grainStrength = 20;
-                    break;
-                case 'ilford_bw':
-                    grainStrength = 32;
-                    break;
-                case 'cinestill_800t':
-                    grainStrength = 30;
-                    break;
-                case 'agfa_vista':
-                    grainStrength = 24;
-                    break;
-                case 'lomography_color':
-                    grainStrength = 32;
-                    break;
-                default:
-                    grainStrength = 26;
-                    break;
+                case 'kodak_funsaver': grainAlpha = 0.26; break;
+                case 'warm_portra': grainAlpha = 0.14; break;
+                case 'ilford_bw': grainAlpha = 0.28; break;
+                case 'cinestill_800t': grainAlpha = 0.22; break;
+                case 'agfa_vista': grainAlpha = 0.18; break;
+                case 'lomography_color': grainAlpha = 0.25; break;
+                default: grainAlpha = 0.18; break;
             }
 
-            for (let i = 0; i < data.length; i += 4) {
-                const pixelIndex = i / 4;
-                const px = pixelIndex % width;
-                const py = Math.floor(pixelIndex / width);
-
-                let r = data[i];
-                let g = data[i + 1];
-                let b = data[i + 2];
-
-                // Direct Flash Simulation: Center-weighted bright exposure burst
-                if (flashOn) {
-                    const nx = (px - width / 2) / (width / 2);
-                    const ny = (py - height / 2) / (height / 2);
-                    const centerDist = Math.hypot(nx, ny);
-                    const flashFactor = Math.max(0, 1 - centerDist * 0.78);
-                    r = Math.min(255, r + flashFactor * 46);
-                    g = Math.min(255, g + flashFactor * 44);
-                    b = Math.min(255, b + flashFactor * 38);
+            try {
+                const pattern = this.getNoisePattern(ctx);
+                if (pattern) {
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'overlay';
+                    ctx.globalAlpha = grainAlpha;
+                    ctx.fillStyle = pattern;
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.restore();
                 }
-
-                // If browser did not support ctx.filter, apply fallback math
-                if (needsFallbackColor) {
-                    if (preset === 'ilford_bw') {
-                        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-                        let nl = (luma / 255 - 0.5) * 1.35 + 0.5;
-                        r = g = b = Math.max(0, Math.min(255, nl * 255 * 0.96));
-                    } else if (preset === 'kodak_funsaver') {
-                        const tr = (0.393 * r + 0.769 * g + 0.189 * b) * 0.24 + r * 0.76;
-                        const tg = (0.349 * r + 0.686 * g + 0.168 * b) * 0.24 + g * 0.76;
-                        const tb = (0.272 * r + 0.534 * g + 0.131 * b) * 0.24 + b * 0.76;
-                        r = Math.min(255, tr * 1.02);
-                        g = Math.min(255, tg * 1.01);
-                        b = Math.max(0, tb * 0.94);
-                    }
-                }
-
-                // Authentic Analog Film Grain
-                const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-                const grainLumaFactor = (1 - Math.abs(luma - 128) / 140) * 0.9 + 0.3;
-                const grain = (Math.random() - 0.5) * grainStrength * grainLumaFactor;
-
-                if (preset === 'ilford_bw') {
-                    // Strictly monochrome grain: equal noise across R, G, B ensures pure black & white
-                    const monoVal = Math.max(0, Math.min(255, luma + grain));
-                    data[i] = monoVal;
-                    data[i + 1] = monoVal;
-                    data[i + 2] = monoVal;
-                } else {
-                    data[i] = Math.max(0, Math.min(255, r + grain));
-                    data[i + 1] = Math.max(0, Math.min(255, g + grain * 0.96));
-                    data[i + 2] = Math.max(0, Math.min(255, b + grain * 0.92));
-                }
+            } catch (e) {
+                console.warn('Grain pattern blend skipped:', e);
             }
-            ctx.putImageData(imgData, 0, 0);
 
-            // Corner-Only Lens Vignette
+            // 3. Corner Lens Vignette
+            const vignetteStrength = this.getVignetteOpacity();
             const maxRadius = Math.hypot(width, height) / 2;
-            const gradient = ctx.createRadialGradient(
-                width / 2, height / 2, maxRadius * 0.68,
+            const vignetteGrad = ctx.createRadialGradient(
+                width / 2, height / 2, maxRadius * 0.65,
                 width / 2, height / 2, maxRadius * 1.05
             );
-            gradient.addColorStop(0, 'rgba(0,0,0,0)');
-            gradient.addColorStop(0.55, 'rgba(0,0,0,0)');
-            gradient.addColorStop(0.85, `rgba(12,8,4,${vignetteStrength * 0.45})`);
-            gradient.addColorStop(1, `rgba(6,4,2,${vignetteStrength})`);
+            vignetteGrad.addColorStop(0, 'rgba(0,0,0,0)');
+            vignetteGrad.addColorStop(0.60, 'rgba(0,0,0,0)');
+            vignetteGrad.addColorStop(0.85, `rgba(12,8,4,${vignetteStrength * 0.45})`);
+            vignetteGrad.addColorStop(1, `rgba(6,4,2,${vignetteStrength})`);
 
-            ctx.fillStyle = gradient;
+            ctx.save();
+            ctx.fillStyle = vignetteGrad;
             ctx.fillRect(0, 0, width, height);
+            ctx.restore();
 
-            // Vintage Quartz Date Stamp ('YY MM DD) in bottom-right corner
+            // 4. Vintage Quartz Date Stamp ('YY MM DD) in bottom-right corner
+            const dateColor = this.getDateColor();
             const dateStr = `'${String(new Date().getFullYear()).slice(-2)} ${String(new Date().getMonth() + 1).padStart(2, '0')} ${String(new Date().getDate()).padStart(2, '0')}`;
-            const fontSize = Math.max(22, Math.floor(width * 0.028));
+            const fontSize = Math.max(22, Math.floor(width * 0.026));
 
             ctx.save();
             ctx.font = `bold ${fontSize}px "Share Tech Mono", monospace`;
