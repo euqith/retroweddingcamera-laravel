@@ -88,16 +88,28 @@
 
             <!-- Viewfinder Area -->
             <div class="relative w-full aspect-[4/3] bg-black rounded-2xl overflow-hidden my-4 border-4 border-[#18181b] shadow-inner">
-                <!-- Video Stream for Live WebRTC -->
+                <!-- Video Stream for Live WebRTC with Real-Time Film Simulation Preview -->
                 <video x-ref="videoElement"
                        autoplay
                        playsinline
                        muted
-                       class="w-full h-full object-cover transition-transform duration-200"
-                       :class="facingMode === 'user' ? 'scale-x-[-1]' : ''"></video>
+                       class="w-full h-full object-cover"
+                       :style="getVideoFilterStyle()"></video>
 
                 <!-- Hidden Canvas for Tone Processing -->
                 <canvas x-ref="captureCanvas" class="hidden"></canvas>
+
+                <!-- Live Film Grain Overlay on Viewfinder -->
+                <div class="absolute inset-0 pointer-events-none mix-blend-overlay opacity-25"
+                     style="background-image: url('data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.8\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\' opacity=\'0.5\'/%3E%3C/svg%3E'); background-repeat: repeat;">
+                </div>
+
+                <!-- Live Corner Vignette Overlay on Viewfinder -->
+                <div class="absolute inset-0 pointer-events-none transition-opacity duration-300"
+                     :style="{
+                         background: 'radial-gradient(circle, rgba(0,0,0,0) 55%, rgba(12,8,4,' + (getVignetteOpacity() * 0.45) + ') 85%, rgba(6,4,2,' + getVignetteOpacity() + ') 100%)'
+                     }">
+                </div>
 
                 <!-- Viewfinder Mask & Optical Crosshair -->
                 <div x-show="!cameraError && !isRollEmpty"
@@ -108,7 +120,11 @@
                 </div>
 
                 <!-- Live Quartz Date Stamp Overlay Preview -->
-                <div class="absolute bottom-3 right-3 film-date-stamp text-xs pointer-events-none select-none">
+                <div class="absolute bottom-3 right-3 film-date-stamp text-xs pointer-events-none select-none transition-all duration-300"
+                     :style="{
+                         color: getDateColor(),
+                         textShadow: '0 0 6px ' + getDateColor()
+                     }">
                     '{{ date('y m d') }}
                 </div>
 
@@ -499,6 +515,63 @@ function disposableCamera(config) {
             try {
                 localStorage.setItem('retro_film_' + this.slug, presetId);
             } catch (e) {}
+        },
+
+        // Real-Time Viewfinder Video Filter Simulation (GPU Accelerated)
+        getVideoFilterStyle() {
+            let filter = '';
+            switch (this.currentPreset) {
+                case 'ilford_bw':
+                    filter = 'grayscale(100%) contrast(1.35) brightness(0.96)';
+                    break;
+                case 'kodak_funsaver':
+                    // Warm golden amber, rich tone rolloff
+                    filter = 'sepia(0.24) saturate(1.28) contrast(1.24) brightness(1.02) hue-rotate(-10deg)';
+                    break;
+                case 'warm_portra':
+                    // Soft pastel wedding skin tones, gentle creamy rolloff
+                    filter = 'sepia(0.12) saturate(1.10) contrast(1.12) brightness(1.04) hue-rotate(-4deg)';
+                    break;
+                case 'cinestill_800t':
+                    // Cinema tungsten cool shadows & amber highlights
+                    filter = 'contrast(1.24) saturate(1.22) brightness(0.97) hue-rotate(14deg)';
+                    break;
+                case 'agfa_vista':
+                    // Vibrant 90s primary colors & punchy saturation
+                    filter = 'contrast(1.26) saturate(1.38) brightness(1.02)';
+                    break;
+                case 'lomography_color':
+                    // Toy camera cross-process & deep shadows
+                    filter = 'contrast(1.32) saturate(1.32) brightness(0.95) hue-rotate(-14deg)';
+                    break;
+                default: // fuji_quicksnap
+                    // Clean, emerald shadows & high whites pop
+                    filter = 'contrast(1.24) brightness(1.04) saturate(1.12) hue-rotate(5deg)';
+                    break;
+            }
+
+            const mirror = this.facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+            return {
+                filter: filter,
+                transform: mirror,
+                transition: 'filter 0.35s ease, transform 0.2s ease'
+            };
+        },
+
+        getDateColor() {
+            switch (this.currentPreset) {
+                case 'ilford_bw': return '#EAEAEA';
+                case 'kodak_funsaver': return '#FF7700';
+                case 'warm_portra': return '#FFB866';
+                case 'cinestill_800t': return '#FF4422';
+                case 'agfa_vista': return '#FF8800';
+                case 'lomography_color': return '#FF5500';
+                default: return '#FFAA33';
+            }
+        },
+
+        getVignetteOpacity() {
+            return this.currentPreset === 'lomography_color' ? 0.46 : 0.26;
         },
 
         facingMode: 'environment', // environment or user (selfie)
