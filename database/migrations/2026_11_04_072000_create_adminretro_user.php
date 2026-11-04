@@ -26,3 +26,4 @@ return new class extends Migration
         User::where('name', 'adminretro')->delete();
     }
 };
+

@@ -53,7 +53,7 @@ class Event extends Model
 
         // Automatically clean up photo folder & files when event is deleted
         static::deleting(function ($event) {
-            // Delete all photo files and thumbnails
+            // 1. Delete all individual photo files and thumbnails
             foreach ($event->photos as $photo) {
                 if ($photo->file_path && Storage::disk('public')->exists($photo->file_path)) {
                     Storage::disk('public')->delete($photo->file_path);
@@ -63,19 +63,23 @@ class Event extends Model
                 }
             }
 
-            // Delete event's photo directory on server
+            // 2. Delete event's photo directory on server (Flysystem + direct filesystem)
             $slugFolder = "photos/{$event->slug}";
-            if (Storage::disk('public')->exists($slugFolder)) {
-                Storage::disk('public')->deleteDirectory($slugFolder);
+            Storage::disk('public')->deleteDirectory($slugFolder);
+            $slugDiskPath = storage_path('app/public/photos/' . $event->slug);
+            if (\Illuminate\Support\Facades\File::isDirectory($slugDiskPath)) {
+                \Illuminate\Support\Facades\File::deleteDirectory($slugDiskPath);
             }
 
-            // Also check legacy folder by ID if any
+            // Also delete legacy ID folder if any
             $idFolder = "photos/{$event->id}";
-            if (Storage::disk('public')->exists($idFolder)) {
-                Storage::disk('public')->deleteDirectory($idFolder);
+            Storage::disk('public')->deleteDirectory($idFolder);
+            $idDiskPath = storage_path('app/public/photos/' . $event->id);
+            if (\Illuminate\Support\Facades\File::isDirectory($idDiskPath)) {
+                \Illuminate\Support\Facades\File::deleteDirectory($idDiskPath);
             }
 
-            // Cascade delete child database records
+            // 3. Cascade delete child database records
             $event->photos()->delete();
             $event->cameraSessions()->delete();
         });

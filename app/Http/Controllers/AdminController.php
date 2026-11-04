@@ -99,15 +99,18 @@ class AdminController extends Controller
     }
 
     /**
-     * Delete Event
+     * Delete Event and its photo directory
      */
     public function destroy(Event $event)
     {
         $title = $event->title;
+        $slug = $event->slug;
+        $photosCount = $event->photos()->count();
+
         $event->delete();
 
         return redirect()->route('admin.dashboard')
-            ->with('success', "Event '{$title}' berhasil dihapus.");
+            ->with('success', "Event '{$title}' dan seluruh {$photosCount} file foto di folder 'photos/{$slug}' berhasil dihapus permanen.");
     }
 
     /**
