@@ -41,6 +41,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // QR Codes
     Route::get('/events/{event}/qrcodes', [AdminController::class, 'qrcodes'])->name('events.qrcodes');
 
+    // Separated Event Photo Gallery Manager
+    Route::get('/events/{event}/gallery', [AdminController::class, 'gallery'])->name('events.gallery');
+
     // Device Sessions & Roll Reset
     Route::get('/events/{event}/sessions', [AdminController::class, 'sessions'])->name('events.sessions');
     Route::post('/events/{event}/sessions/reset-all', [AdminController::class, 'resetAllSessions'])->name('events.sessions.reset-all');

@@ -65,6 +65,30 @@
                 </span>
             </div>
         </div>
+
+        @if(isset($recentPhotos) && $recentPhotos->count() > 0)
+            <!-- Community Photos Preview (Everyone's shots visible on Home) -->
+            <div class="mt-6 pt-5 border-t border-wedding-gold/20 text-left">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-wedding-dark">Foto Terbaru Semua Tamu</span>
+                    <a href="{{ route('event.gallery', $event->slug) }}" class="text-xs text-wedding-gold hover:underline font-medium">
+                        Lihat Semua ({{ $photosCount }}) →
+                    </a>
+                </div>
+                <div class="grid grid-cols-4 gap-2">
+                    @foreach($recentPhotos as $photo)
+                        <a href="{{ route('event.gallery', $event->slug) }}" class="aspect-square rounded-xl overflow-hidden bg-wedding-linen border border-wedding-gold/30 hover:opacity-90 transition-opacity block relative group">
+                            <img src="{{ $photo->thumbnail_url ?: $photo->url }}"
+                                 alt="Foto Acara {{ $event->title }}"
+                                 class="w-full h-full object-cover">
+                            <span class="absolute bottom-1 right-1 text-[8px] font-mono text-amber-300 drop-shadow opacity-0 group-hover:opacity-100 transition-opacity">
+                                '{{ $photo->taken_at ? $photo->taken_at->format('y m d') : date('y m d') }}
+                            </span>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        @endif
     </div>
 
     <!-- Actions -->

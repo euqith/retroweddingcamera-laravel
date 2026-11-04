@@ -92,9 +92,9 @@
                                     <span>Buka Kamera</span>
                                 </a>
 
-                                <a href="{{ route('event.gallery', $event->slug) }}" target="_blank"
+                                <a href="{{ route('admin.events.gallery', $event) }}"
                                    class="px-3 py-1.5 bg-wedding-linen hover:bg-wedding-gold/20 text-wedding-dark text-xs font-semibold rounded-lg transition-colors flex items-center space-x-1">
-                                    <span>Galeri</span>
+                                    <span>Galeri Event ({{ $event->photos_count }})</span>
                                 </a>
 
                                 <a href="{{ route('admin.events.qrcodes', $event) }}"

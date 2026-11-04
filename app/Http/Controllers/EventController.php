@@ -60,8 +60,13 @@ class EventController extends Controller
         $session = $this->getCameraSession($event, $deviceToken, $request);
 
         $photosCount = $event->photos()->where('is_visible', true)->count();
+        $recentPhotos = $event->photos()
+            ->where('is_visible', true)
+            ->latest('taken_at')
+            ->take(8)
+            ->get();
 
-        return view('events.landing', compact('event', 'session', 'deviceToken', 'photosCount'));
+        return view('events.landing', compact('event', 'session', 'deviceToken', 'photosCount', 'recentPhotos'));
     }
 
     /**
@@ -73,7 +78,17 @@ class EventController extends Controller
         $deviceToken = $this->getDeviceToken($request);
         $session = $this->getCameraSession($event, $deviceToken, $request);
 
-        return view('events.camera', compact('event', 'session', 'deviceToken'));
+        $myPhotos = $session->photos()->orderBy('shot_number', 'desc')->get()->map(function ($p) {
+            return [
+                'id' => $p->id,
+                'shot_number' => $p->shot_number,
+                'url' => $p->url,
+                'thumbnail_url' => $p->thumbnail_url,
+                'taken_at' => $p->taken_at->format('H:i'),
+            ];
+        });
+
+        return view('events.camera', compact('event', 'session', 'deviceToken', 'myPhotos'));
     }
 
     /**

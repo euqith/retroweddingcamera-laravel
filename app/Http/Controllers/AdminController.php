@@ -126,6 +126,15 @@ class AdminController extends Controller
     }
 
     /**
+     * View and moderate photos for a specific event
+     */
+    public function gallery(Event $event)
+    {
+        $photos = $event->photos()->latest('taken_at')->paginate(24);
+        return view('admin.events.gallery', compact('event', 'photos'));
+    }
+
+    /**
      * Device Sessions & Roll Reset Manager
      */
     public function sessions(Event $event)
