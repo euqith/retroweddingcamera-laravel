@@ -99,6 +99,15 @@
                 <!-- Hidden Canvas for Tone Processing -->
                 <canvas x-ref="captureCanvas" class="hidden"></canvas>
 
+                <!-- Live Film Stock Badge on Viewfinder (Top-Left) -->
+                <button @click="showFilmModal = true"
+                        type="button"
+                        class="absolute top-3 left-3 bg-black/60 backdrop-blur-xs border border-white/30 text-wedding-gold font-mono text-[10px] font-bold px-2 py-0.5 rounded-full z-10 flex items-center space-x-1 hover:bg-black/80 transition-colors pointer-events-auto">
+                    <span>🎞️</span>
+                    <span x-text="getActiveFilm().badge"></span>
+                    <span class="text-[8px] text-white/70">▾</span>
+                </button>
+
                 <!-- Viewfinder Mask & Optical Crosshair -->
                 <div x-show="!cameraError && !isRollEmpty"
                      class="absolute inset-0 border border-white/20 pointer-events-none rounded-xl m-2 flex items-center justify-center">
@@ -164,6 +173,35 @@
                      style="display: none;">
                     <div class="w-8 h-8 border-2 border-wedding-gold border-t-transparent rounded-full animate-spin mb-2"></div>
                     <span class="text-[11px] tracking-widest uppercase font-mono text-wedding-gold">Developing Film...</span>
+                </div>
+            </div>
+
+            <!-- QUICK HORIZONTAL FILM STOCK CAROUSEL / SELECTOR -->
+            <div class="my-2 pb-1">
+                <div class="flex items-center justify-between px-0.5 mb-1.5">
+                    <div class="flex items-center space-x-1.5">
+                        <span class="text-[10px] uppercase font-bold tracking-wider text-wedding-dark/80">🎞️ Roll Film:</span>
+                        <span class="text-[11px] font-mono font-bold text-wedding-filmOrange" x-text="getActiveFilm().name"></span>
+                    </div>
+                    <button @click="showFilmModal = true"
+                            type="button"
+                            class="text-[10px] text-wedding-gold hover:text-wedding-goldHover font-bold tracking-wider uppercase underline">
+                        Semua (7) ➔
+                    </button>
+                </div>
+                <div class="flex items-center space-x-2 overflow-x-auto py-1 px-0.5 no-scrollbar">
+                    <template x-for="preset in filmPresets" :key="preset.id">
+                        <button @click="setFilm(preset.id)"
+                                type="button"
+                                class="flex-shrink-0 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all shadow-xs flex items-center space-x-1.5"
+                                :class="currentPreset === preset.id 
+                                    ? 'bg-[#231F1E] text-wedding-gold border-wedding-gold ring-2 ring-wedding-gold/40 scale-105 shadow' 
+                                    : 'bg-white/90 text-wedding-dark/70 border-wedding-gold/30 hover:bg-white hover:border-wedding-gold'">
+                            <span class="w-1.5 h-1.5 rounded-full"
+                                  :class="currentPreset === preset.id ? 'bg-wedding-gold' : 'bg-gray-300'"></span>
+                            <span x-text="preset.badge"></span>
+                        </button>
+                    </template>
                 </div>
             </div>
 
@@ -360,6 +398,8 @@
                 </a>
             </div>
         </div>
+    </div>
+
     <!-- FILM PRESET SELECTOR MODAL / BOTTOM SHEET -->
     <div x-show="showFilmModal"
          x-transition:enter="transition ease-out duration-200"
@@ -386,7 +426,7 @@
 
             <div class="overflow-y-auto space-y-2.5 pr-1 flex-1">
                 <template x-for="preset in filmPresets" :key="preset.id">
-                    <button @click="currentPreset = preset.id; showFilmModal = false;"
+                    <button @click="setFilm(preset.id); showFilmModal = false;"
                             type="button"
                             class="w-full text-left p-3.5 rounded-2xl border transition-all flex items-center justify-between"
                             :class="currentPreset === preset.id ? 'bg-wedding-linen border-wedding-gold shadow-sm ring-1 ring-wedding-gold' : 'bg-white border-wedding-gold/20 hover:border-wedding-gold/50'">
@@ -432,7 +472,13 @@ function disposableCamera(config) {
         showMyGallery: false,
         previewPhoto: null,
         showFilmModal: false,
-        currentPreset: config.filterPreset || 'fuji_quicksnap',
+        currentPreset: (function() {
+            try {
+                return localStorage.getItem('retro_film_' + config.slug) || config.filterPreset || 'fuji_quicksnap';
+            } catch (e) {
+                return config.filterPreset || 'fuji_quicksnap';
+            }
+        })(),
 
         // 7 Rich Authentic Vintage Analog Film Stock Recipes
         filmPresets: [
@@ -447,6 +493,13 @@ function disposableCamera(config) {
 
         getActiveFilm() {
             return this.filmPresets.find(p => p.id === this.currentPreset) || this.filmPresets[0];
+        },
+
+        setFilm(presetId) {
+            this.currentPreset = presetId;
+            try {
+                localStorage.setItem('retro_film_' + this.slug, presetId);
+            } catch (e) {}
         },
 
         facingMode: 'environment', // environment or user (selfie)
