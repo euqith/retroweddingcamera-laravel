@@ -99,15 +99,6 @@
                 <!-- Hidden Canvas for Tone Processing -->
                 <canvas x-ref="captureCanvas" class="hidden"></canvas>
 
-                <!-- Live Film Stock Badge on Viewfinder (Top-Left) -->
-                <button @click="showFilmModal = true"
-                        type="button"
-                        class="absolute top-3 left-3 bg-black/60 backdrop-blur-xs border border-white/30 text-wedding-gold font-mono text-[10px] font-bold px-2 py-0.5 rounded-full z-10 flex items-center space-x-1 hover:bg-black/80 transition-colors pointer-events-auto">
-                    <span>🎞️</span>
-                    <span x-text="getActiveFilm().badge"></span>
-                    <span class="text-[8px] text-white/70">▾</span>
-                </button>
-
                 <!-- Viewfinder Mask & Optical Crosshair -->
                 <div x-show="!cameraError && !isRollEmpty"
                      class="absolute inset-0 border border-white/20 pointer-events-none rounded-xl m-2 flex items-center justify-center">
