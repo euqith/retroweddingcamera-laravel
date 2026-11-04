@@ -9,6 +9,7 @@ use App\Services\ImageProcessingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use ZipArchive;
 
@@ -114,6 +115,7 @@ class EventController extends Controller
             'image' => 'required|string',
             'camera_facing' => 'nullable|string|in:environment,user',
             'flash_enabled' => 'nullable|boolean',
+            'filter_applied' => 'nullable|string|max:50',
             'caption' => 'nullable|string|max:255',
         ]);
 
@@ -134,7 +136,7 @@ class EventController extends Controller
             'thumbnail_path' => $stored['thumbnail_path'],
             'camera_facing' => $request->input('camera_facing', 'environment'),
             'flash_enabled' => (bool) $request->input('flash_enabled', false),
-            'filter_applied' => $event->filter_preset ?? 'fuji_quicksnap',
+            'filter_applied' => $request->input('filter_applied') ?: ($event->filter_preset ?? 'fuji_quicksnap'),
             'caption' => $request->input('caption'),
             'is_visible' => true,
             'taken_at' => now(),
@@ -209,6 +211,66 @@ class EventController extends Controller
             'max_shots' => $session->max_shots,
             'remaining' => $session->remaining_shots,
         ]);
+    }
+
+    /**
+     * Direct photo streamer (immune to shared hosting symlink issues)
+     */
+    public function viewPhoto(Photo $photo)
+    {
+        $disk = Storage::disk('public');
+        if ($photo->file_path && $disk->exists($photo->file_path)) {
+            return response()->file($disk->path($photo->file_path), [
+                'Content-Type' => 'image/jpeg',
+                'Cache-Control' => 'public, max-age=31536000',
+            ]);
+        }
+
+        return $this->serveDemoFallbackPhoto($photo->shot_number);
+    }
+
+    /**
+     * Direct thumbnail streamer
+     */
+    public function viewThumbnail(Photo $photo)
+    {
+        $disk = Storage::disk('public');
+        $path = $photo->thumbnail_path ?: $photo->file_path;
+        if ($path && $disk->exists($path)) {
+            return response()->file($disk->path($path), [
+                'Content-Type' => 'image/jpeg',
+                'Cache-Control' => 'public, max-age=31536000',
+            ]);
+        }
+
+        return $this->serveDemoFallbackPhoto($photo->shot_number);
+    }
+
+    /**
+     * Fallback photo if database was dumped from local without storage files
+     */
+    protected function serveDemoFallbackPhoto(int $shotNumber)
+    {
+        $attachmentMap = [
+            1 => 'IMG_2820.JPG',
+            2 => 'IMG_2821.JPG',
+            3 => 'IMG_2823.JPG',
+            4 => 'IMG_2825.JPG',
+            5 => 'IMG_2831.JPG',
+            6 => 'IMG_2832.JPG',
+        ];
+
+        $filename = $attachmentMap[((abs($shotNumber - 1)) % 6) + 1] ?? 'IMG_2820.JPG';
+        $fallback = base_path('attachment/' . $filename);
+
+        if (file_exists($fallback)) {
+            return response()->file($fallback, [
+                'Content-Type' => 'image/jpeg',
+                'Cache-Control' => 'public, max-age=31536000',
+            ]);
+        }
+
+        abort(404);
     }
 }
 

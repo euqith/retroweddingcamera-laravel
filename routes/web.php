@@ -19,6 +19,15 @@ Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::post('/login/quick', [AuthController::class, 'quickLogin'])->name('login.quick');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+// Direct Photo Streaming Routes (Immune to symlink & hostinger permission issues)
+Route::get('/photos/view/{photo}', [EventController::class, 'viewPhoto'])->name('photo.view');
+Route::get('/photos/thumb/{photo}', [EventController::class, 'viewThumbnail'])->name('photo.thumbnail');
+
+// Root shortcut to repair storage link
+Route::get('/storage-link', function () {
+    return redirect()->route('admin.storage.link');
+});
+
 // Guest & Disposable Camera Routes
 Route::prefix('e/{slug}')->group(function () {
     Route::get('/', [EventController::class, 'landing'])->name('event.landing');
@@ -64,15 +73,24 @@ Route::prefix('admin')->name('admin.')->group(function () {
             $logs[] = "Created directory: storage/app/public";
         }
 
-        // 2. Remove broken/dead symlink from local development
-        if (is_link($publicStorage) || file_exists($publicStorage)) {
-            if (is_link($publicStorage)) {
-                $currentTarget = @readlink($publicStorage);
-                $logs[] = "Detected existing symlink -> " . ($currentTarget ?: 'unknown');
+        // 2. Remove broken/dead symlink or empty directory blocking storage link
+        if (is_link($publicStorage)) {
+            $currentTarget = @readlink($publicStorage);
+            $logs[] = "Detected existing symlink -> " . ($currentTarget ?: 'unknown');
+            @unlink($publicStorage);
+            $logs[] = "Removed old symlink.";
+        } elseif (file_exists($publicStorage)) {
+            if (is_dir($publicStorage)) {
+                $files = @scandir($publicStorage);
+                if (count($files) <= 2) {
+                    @rmdir($publicStorage);
+                    $logs[] = "Removed empty public/storage directory to allow symlink creation.";
+                } else {
+                    $logs[] = "public/storage is an actual directory with " . (count($files) - 2) . " items.";
+                }
+            } else {
                 @unlink($publicStorage);
-                $logs[] = "Removed old symlink.";
-            } elseif (is_dir($publicStorage)) {
-                $logs[] = "public/storage is an actual directory.";
+                $logs[] = "Removed stray public/storage file.";
             }
         }
 

@@ -244,5 +244,30 @@ class RetroCameraTest extends TestCase
         $this->assertDatabaseCount('photos', 0);
         $this->assertEmpty(Storage::disk('public')->allFiles("photos/daniel-clara"));
     }
+
+    public function test_photo_streaming_route_serves_file_and_thumbnail(): void
+    {
+        $dummyBase64 = 'data:image/png;base64,' . base64_encode(
+            imagepng(imagecreatetruecolor(50, 50)) ? ob_get_clean() : ''
+        );
+
+        $this->postJson('/e/daniel-clara/camera/capture', [
+            'image' => $dummyBase64,
+            'camera_facing' => 'environment',
+            'flash_enabled' => false,
+        ]);
+
+        $photo = Photo::first();
+        $this->assertNotNull($photo);
+
+        $this->assertStringContainsString("/photos/view/{$photo->id}", $photo->url);
+        $this->assertStringContainsString("/photos/thumb/{$photo->id}", $photo->thumbnail_url);
+
+        $viewResponse = $this->get($photo->url);
+        $viewResponse->assertStatus(200);
+
+        $thumbResponse = $this->get($photo->thumbnail_url);
+        $thumbResponse->assertStatus(200);
+    }
 }
 

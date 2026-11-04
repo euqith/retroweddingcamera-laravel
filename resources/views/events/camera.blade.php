@@ -74,7 +74,15 @@
                 <div class="flex items-center justify-center space-x-2 text-[10px] tracking-wider text-wedding-olive uppercase font-semibold">
                     <span>36 Exposures</span>
                     <span>•</span>
-                    <span>ISO 800 Grain</span>
+                    <!-- Film Simulation Switcher Badge -->
+                    <button @click="showFilmModal = true"
+                            type="button"
+                            class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full bg-wedding-dark/10 hover:bg-wedding-dark/20 text-[#231F1E] font-mono text-[9px] font-bold tracking-wider transition-colors border border-wedding-gold/40 shadow-xs"
+                            title="Ganti Simulasi Film">
+                        <span>🎞️</span>
+                        <span x-text="getActiveFilm().badge"></span>
+                        <span class="text-[8px] text-wedding-gold">▼</span>
+                    </button>
                 </div>
             </div>
 
@@ -352,6 +360,58 @@
                 </a>
             </div>
         </div>
+    <!-- FILM PRESET SELECTOR MODAL / BOTTOM SHEET -->
+    <div x-show="showFilmModal"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+         style="display: none;"
+         @keydown.escape.window="showFilmModal = false">
+
+        <div class="w-full max-w-md bg-[#FAF6F0] rounded-t-[2.5rem] sm:rounded-3xl p-6 shadow-2xl border-t-2 sm:border-2 border-wedding-gold/40 max-h-[85vh] flex flex-col"
+             @click.away="showFilmModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-wedding-gold/20 mb-3">
+                <div>
+                    <span class="text-[10px] uppercase tracking-widest text-wedding-gold font-bold block">Pilih Karakter Film</span>
+                    <h3 class="font-serif text-xl font-bold text-wedding-dark">Simulasi Roll Film 35mm</h3>
+                </div>
+                <button @click="showFilmModal = false" class="p-2 text-wedding-dark/60 hover:text-wedding-dark rounded-full text-base">
+                    ✕
+                </button>
+            </div>
+
+            <div class="overflow-y-auto space-y-2.5 pr-1 flex-1">
+                <template x-for="preset in filmPresets" :key="preset.id">
+                    <button @click="currentPreset = preset.id; showFilmModal = false;"
+                            type="button"
+                            class="w-full text-left p-3.5 rounded-2xl border transition-all flex items-center justify-between"
+                            :class="currentPreset === preset.id ? 'bg-wedding-linen border-wedding-gold shadow-sm ring-1 ring-wedding-gold' : 'bg-white border-wedding-gold/20 hover:border-wedding-gold/50'">
+                        <div class="pr-2">
+                            <div class="flex items-center space-x-2 mb-1">
+                                <span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-[#231F1E] text-wedding-gold" x-text="preset.badge"></span>
+                                <span class="font-serif text-sm font-bold text-wedding-dark" x-text="preset.name"></span>
+                            </div>
+                            <span class="text-[11px] text-wedding-olive font-semibold block" x-text="preset.tag"></span>
+                            <span class="text-[10px] text-wedding-subtle block mt-0.5 leading-snug" x-text="preset.desc"></span>
+                        </div>
+                        <div class="w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0"
+                             :class="currentPreset === preset.id ? 'border-wedding-gold bg-wedding-gold text-white' : 'border-gray-300'">
+                            <span x-show="currentPreset === preset.id" class="text-xs">✓</span>
+                        </div>
+                    </button>
+                </template>
+            </div>
+
+            <div class="pt-3 border-t border-wedding-gold/20 text-center mt-3">
+                <p class="text-[10px] text-wedding-subtle">
+                    Setiap foto akan diproses dengan karakter kurva tone, saturasi warna, dan grain dari roll film yang dipilih.
+                </p>
+            </div>
+        </div>
     </div>
 </div>
 @endsection
@@ -371,6 +431,24 @@ function disposableCamera(config) {
         myPhotos: config.initialMyPhotos || [],
         showMyGallery: false,
         previewPhoto: null,
+        showFilmModal: false,
+        currentPreset: config.filterPreset || 'fuji_quicksnap',
+
+        // 7 Rich Authentic Vintage Analog Film Stock Recipes
+        filmPresets: [
+            { id: 'fuji_quicksnap', name: 'Fuji QuickSnap 400', badge: 'FUJI 400', tag: 'Natural & Emerald Shadows', desc: 'Tone sejuk jernih, shadow emerald & highlight putih pop khas kamera sekali pakai legendaris' },
+            { id: 'kodak_funsaver', name: 'Kodak FunSaver 800', badge: 'KODAK 800', tag: 'Warm Amber & Coarse Grain', desc: 'Nuansa emas hangat, warna merah-kuning kaya, dan butiran grain kasar ISO 800' },
+            { id: 'warm_portra', name: 'Kodak Portra 400', badge: 'PORTRA 400', tag: 'Soft Pastel Skin Tones', desc: 'Tone warna kulit lembut & creamy, kontras halus sangat cocok untuk momen wedding' },
+            { id: 'ilford_bw', name: 'Ilford HP5 Plus 400', badge: 'ILFORD B&W', tag: 'Classic Silver Monochrome', desc: 'Hitam putih analog kontras tinggi dengan gradasi perak dramatis & grain klasik' },
+            { id: 'cinestill_800t', name: 'CineStill 800T Cinema', badge: 'CINE 800T', tag: 'Tungsten Blues & Red Halation', desc: 'Nuansa film layar lebar malam hari, bayangan biru dingin dan kilau hangat pada lampu' },
+            { id: 'agfa_vista', name: 'Agfa Vista 200', badge: 'AGFA 200', tag: 'Vibrant 90s Nostalgia', desc: 'Warna-warna primer cerah, saturasi merah-biru menyala ala snapshot pesta era 90-an' },
+            { id: 'lomography_color', name: 'Lomography 400', badge: 'LOMO 400', tag: 'Toy Camera & Vignette', desc: 'Saturasi tinggi eksentrik, cross-process magenta-teal dan efek vignetting sudut pekat' }
+        ],
+
+        getActiveFilm() {
+            return this.filmPresets.find(p => p.id === this.currentPreset) || this.filmPresets[0];
+        },
+
         facingMode: 'environment', // environment or user (selfie)
         flashEnabled: false,
         isFlashing: false,
@@ -539,20 +617,41 @@ function disposableCamera(config) {
             const canvas = this.$refs.captureCanvas;
             const ctx = canvas.getContext('2d');
 
-            const width = video.videoWidth || 1280;
-            const height = video.videoHeight || 960;
-            canvas.width = width;
-            canvas.height = height;
+            const videoW = video.videoWidth || 1280;
+            const videoH = video.videoHeight || 960;
+
+            // STRICT 4:3 LANDSCAPE CROP (MATCHES VIEWFINDER PIXEL-PERFECT)
+            const targetAspect = 4 / 3;
+            let cropX = 0, cropY = 0, cropW = videoW, cropH = videoH;
+
+            if (videoW / videoH > targetAspect) {
+                // Source is wider than 4:3 (e.g. 16:9 landscape) -> crop left & right
+                cropH = videoH;
+                cropW = Math.round(videoH * targetAspect);
+                cropX = Math.round((videoW - cropW) / 2);
+            } else {
+                // Source is taller than 4:3 (e.g. 9:16 portrait phone) -> crop top & bottom to exact 4:3 window seen by user
+                cropW = videoW;
+                cropH = Math.round(videoW / targetAspect);
+                cropY = Math.round((videoH - cropH) / 2);
+            }
+
+            const outputWidth = Math.min(1600, Math.max(1280, cropW));
+            const outputHeight = Math.round(outputWidth / targetAspect);
+
+            canvas.width = outputWidth;
+            canvas.height = outputHeight;
 
             ctx.save();
             if (this.facingMode === 'user') {
-                ctx.translate(width, 0);
+                ctx.translate(outputWidth, 0);
                 ctx.scale(-1, 1);
             }
-            ctx.drawImage(video, 0, 0, width, height);
+            // Draw exact 4:3 landscape slice that was framed inside the viewfinder
+            ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, outputWidth, outputHeight);
             ctx.restore();
 
-            // Turn off screen flash
+            // Turn off screen flash & hardware torch immediately
             if (this.flashEnabled) {
                 this.isFlashing = false;
                 if (this.stream) {
@@ -565,8 +664,8 @@ function disposableCamera(config) {
                 }
             }
 
-            // Apply Punchy Disposable Film Tone with High Whites & ISO 800 Grain
-            this.applyDisposableFilter(ctx, width, height, this.flashEnabled);
+            // Apply selected film stock filter recipe
+            this.applyDisposableFilter(ctx, outputWidth, outputHeight, this.flashEnabled, this.currentPreset);
 
             const imageData = canvas.toDataURL('image/jpeg', 0.90);
             await this.uploadPhotoData(imageData);
@@ -586,25 +685,32 @@ function disposableCamera(config) {
                     const canvas = this.$refs.captureCanvas;
                     const ctx = canvas.getContext('2d');
 
-                    let width = img.width;
-                    let height = img.height;
-                    const maxDim = 1920;
-                    if (width > maxDim || height > maxDim) {
-                        if (width > height) {
-                            height = Math.round((height * maxDim) / width);
-                            width = maxDim;
-                        } else {
-                            width = Math.round((width * maxDim) / height);
-                            height = maxDim;
-                        }
+                    const imgW = img.width;
+                    const imgH = img.height;
+
+                    // STRICT 4:3 LANDSCAPE CROP (MATCHES VIEWFINDER PIXEL-PERFECT)
+                    const targetAspect = 4 / 3;
+                    let cropX = 0, cropY = 0, cropW = imgW, cropH = imgH;
+
+                    if (imgW / imgH > targetAspect) {
+                        cropH = imgH;
+                        cropW = Math.round(imgH * targetAspect);
+                        cropX = Math.round((imgW - cropW) / 2);
+                    } else {
+                        cropW = imgW;
+                        cropH = Math.round(imgW / targetAspect);
+                        cropY = Math.round((imgH - cropH) / 2);
                     }
 
-                    canvas.width = width;
-                    canvas.height = height;
-                    ctx.drawImage(img, 0, 0, width, height);
+                    const outputWidth = Math.min(1920, Math.max(1280, cropW));
+                    const outputHeight = Math.round(outputWidth / targetAspect);
 
-                    // Apply Punchy Disposable Film Tone with High Whites & ISO 800 Grain
-                    this.applyDisposableFilter(ctx, width, height, this.flashEnabled);
+                    canvas.width = outputWidth;
+                    canvas.height = outputHeight;
+                    ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outputWidth, outputHeight);
+
+                    // Apply selected film stock filter recipe
+                    this.applyDisposableFilter(ctx, outputWidth, outputHeight, this.flashEnabled, this.currentPreset);
 
                     const imageData = canvas.toDataURL('image/jpeg', 0.90);
                     await this.uploadPhotoData(imageData);
@@ -627,7 +733,8 @@ function disposableCamera(config) {
                     body: JSON.stringify({
                         image: imageData,
                         camera_facing: this.facingMode,
-                        flash_enabled: this.flashEnabled
+                        flash_enabled: this.flashEnabled,
+                        filter_applied: this.currentPreset
                     })
                 });
 
@@ -649,7 +756,7 @@ function disposableCamera(config) {
 
                     setTimeout(() => {
                         this.isProcessing = false;
-                    }, 600);
+                    }, 500);
                 } else {
                     alert(data.message || 'Gagal menyimpan foto.');
                     this.isProcessing = false;
@@ -661,17 +768,54 @@ function disposableCamera(config) {
             }
         },
 
-        // Color grading replicating the disposable camera look:
-        // - High punchy contrast & high whites
-        // - ISO 800 organic gritty grain
-        // - Natural corner-only vignette (no middle circle blob)
-        // - Direct flash exposure pop
-        applyDisposableFilter(ctx, width, height, flashOn) {
+        // 7 Authentic Analog Film Stock Tone Recipes
+        applyDisposableFilter(ctx, width, height, flashOn, preset = this.currentPreset) {
             const imgData = ctx.getImageData(0, 0, width, height);
             const data = imgData.data;
 
-            const contrast = 1.26; // High punchy contrast
-            const midShift = 4;
+            let contrast = 1.26;
+            let grainStrength = 32;
+            let vignetteStrength = 0.32;
+            let dateColor = '#FFAA33';
+
+            switch (preset) {
+                case 'kodak_funsaver':
+                    contrast = 1.28;
+                    grainStrength = 40; // Gritty ISO 800
+                    dateColor = '#FF7700'; // Deep Amber
+                    break;
+                case 'warm_portra':
+                    contrast = 1.14; // Gentle fine art rolloff
+                    grainStrength = 22; // Silky ISO 400
+                    dateColor = '#FFB866';
+                    break;
+                case 'ilford_bw':
+                    contrast = 1.34; // Deep contrast silver monochrome
+                    grainStrength = 36;
+                    dateColor = '#F4F4F4'; // White Quartz stamp
+                    break;
+                case 'cinestill_800t':
+                    contrast = 1.24;
+                    grainStrength = 34; // ISO 800 cinema grain
+                    dateColor = '#FF4422'; // Neon halation red
+                    break;
+                case 'agfa_vista':
+                    contrast = 1.28; // Punchy 90s snapshot
+                    grainStrength = 26;
+                    dateColor = '#FF8800';
+                    break;
+                case 'lomography_color':
+                    contrast = 1.30;
+                    grainStrength = 34;
+                    vignetteStrength = 0.46; // Heavy toy camera vignette
+                    dateColor = '#FF5500';
+                    break;
+                default: // fuji_quicksnap
+                    contrast = 1.26;
+                    grainStrength = 30;
+                    dateColor = '#FFAA33';
+                    break;
+            }
 
             for (let i = 0; i < data.length; i += 4) {
                 const pixelIndex = i / 4;
@@ -693,49 +837,91 @@ function disposableCamera(config) {
                     b += flashFactor * 38;
                 }
 
-                // S-Curve Contrast: Deep rich darks, intense pop highlights
-                let nr = r / 255;
-                let ng = g / 255;
-                let nb = b / 255;
+                // Preset-specific Color Matrix Shifting
+                if (preset === 'ilford_bw') {
+                    // Monochrome Luminance
+                    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+                    let nl = luma / 255;
+                    nl = Math.pow(nl, 0.92);
+                    nl = (nl - 0.5) * contrast + 0.5;
+                    r = g = b = nl * 255;
+                } else {
+                    if (preset === 'kodak_funsaver') {
+                        // Golden amber shift
+                        r += 10;
+                        g += 4;
+                        b = Math.max(0, b - 10);
+                    } else if (preset === 'warm_portra') {
+                        // Soft peach skin tones
+                        r += 6;
+                        g += 2;
+                        b = Math.max(0, b - 4);
+                    } else if (preset === 'cinestill_800t') {
+                        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+                        if (luma < 120) {
+                            // Tungsten cool teal shadows
+                            b = Math.min(255, b + 14);
+                            g = Math.min(255, g + 4);
+                            r = Math.max(0, r - 6);
+                        } else {
+                            // Warm red halation on lights
+                            r = Math.min(255, r + 12);
+                            g = Math.min(255, g + 2);
+                        }
+                    } else if (preset === 'agfa_vista') {
+                        // Punchy primary saturation
+                        r = r * 1.06 + 4;
+                        b = b * 1.04 + 2;
+                    } else if (preset === 'lomography_color') {
+                        // Cross-process tint
+                        r = Math.min(255, r * 1.05 + 6);
+                        b = Math.min(255, b * 1.08 + 4);
+                    }
 
-                // Lift whites aggressively (Disposable Camera High Whites)
-                nr = Math.pow(nr, 0.90);
-                ng = Math.pow(ng, 0.90);
-                nb = Math.pow(nb, 0.94);
+                    // S-Curve Contrast & White Pop
+                    let nr = r / 255;
+                    let ng = g / 255;
+                    let nb = b / 255;
 
-                nr = (nr - 0.5) * contrast + 0.5;
-                ng = (ng - 0.5) * contrast + 0.5;
-                nb = (nb - 0.5) * contrast + 0.5;
+                    nr = Math.pow(nr, 0.90);
+                    ng = Math.pow(ng, 0.90);
+                    nb = Math.pow(nb, 0.94);
 
-                r = nr * 255 + midShift;
-                g = ng * 255 + midShift;
-                b = nb * 255 + midShift;
+                    nr = (nr - 0.5) * contrast + 0.5;
+                    ng = (ng - 0.5) * contrast + 0.5;
+                    nb = (nb - 0.5) * contrast + 0.5;
 
-                // High Whites / Creamy highlights
-                if (r > 165) {
-                    r = Math.min(255, r * 1.08 + 10);
-                    g = Math.min(255, g * 1.06 + 8);
+                    r = nr * 255 + 4;
+                    g = ng * 255 + 4;
+                    b = nb * 255 + 4;
+
+                    // High Whites / Creamy highlights
+                    if (r > 165) {
+                        r = Math.min(255, r * 1.08 + 10);
+                        g = Math.min(255, g * 1.06 + 8);
+                    }
+
+                    // Shadow character
+                    if (r < 75) {
+                        if (preset === 'fuji_quicksnap') {
+                            g = Math.max(8, g * 0.98 + 4); // Emerald shadow
+                        }
+                        r = Math.max(5, r * 0.95);
+                    }
                 }
 
-                // Film Negative Shadow Character (Deep blacks with subtle tint)
-                if (r < 70) {
-                    r = Math.max(5, r * 0.95);
-                    g = Math.max(8, g * 0.98 + 4);
-                    b = Math.max(5, b * 0.92);
-                }
-
-                // Coarse ISO 800 Film Grain Simulation
+                // Film Grain Simulation
                 const luma = 0.299 * r + 0.587 * g + 0.114 * b;
                 const grainLumaFactor = (1 - Math.abs(luma - 128) / 140) * 0.9 + 0.3;
-                const grain = (Math.random() - 0.5) * 36 * grainLumaFactor;
+                const grain = (Math.random() - 0.5) * grainStrength * grainLumaFactor;
 
                 data[i] = Math.max(0, Math.min(255, r + grain));
-                data[i + 1] = Math.max(0, Math.min(255, g + grain * 0.94));
-                data[i + 2] = Math.max(0, Math.min(255, b + grain * 0.88));
+                data[i + 1] = Math.max(0, Math.min(255, g + (preset === 'ilford_bw' ? grain : grain * 0.94)));
+                data[i + 2] = Math.max(0, Math.min(255, b + (preset === 'ilford_bw' ? grain : grain * 0.88)));
             }
             ctx.putImageData(imgData, 0, 0);
 
-            // 2. CORNER-ONLY NATURAL LENS SHADING (FIXED: NO CIRCLE IN CENTER)
+            // Corner-Only Lens Vignette
             const maxRadius = Math.hypot(width, height) / 2;
             const gradient = ctx.createRadialGradient(
                 width / 2, height / 2, maxRadius * 0.68,
@@ -743,13 +929,13 @@ function disposableCamera(config) {
             );
             gradient.addColorStop(0, 'rgba(0,0,0,0)');
             gradient.addColorStop(0.55, 'rgba(0,0,0,0)');
-            gradient.addColorStop(0.85, 'rgba(12,8,4,0.14)');
-            gradient.addColorStop(1, 'rgba(6,4,2,0.32)');
+            gradient.addColorStop(0.85, `rgba(12,8,4,${vignetteStrength * 0.45})`);
+            gradient.addColorStop(1, `rgba(6,4,2,${vignetteStrength})`);
 
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, width, height);
 
-            // 3. Vintage Orange Quartz Date Stamp ('YY MM DD) in bottom-right corner
+            // Vintage Quartz Date Stamp ('YY MM DD) in bottom-right corner
             const dateStr = `'${String(new Date().getFullYear()).slice(-2)} ${String(new Date().getMonth() + 1).padStart(2, '0')} ${String(new Date().getDate()).padStart(2, '0')}`;
             const fontSize = Math.max(22, Math.floor(width * 0.028));
 
@@ -757,9 +943,9 @@ function disposableCamera(config) {
             ctx.font = `bold ${fontSize}px "Share Tech Mono", monospace`;
             ctx.textAlign = 'right';
             ctx.textBaseline = 'bottom';
-            ctx.shadowColor = '#FF7700';
+            ctx.shadowColor = dateColor;
             ctx.shadowBlur = fontSize * 0.4;
-            ctx.fillStyle = '#FFAA33';
+            ctx.fillStyle = dateColor;
             ctx.fillText(dateStr, width - (fontSize * 1.2), height - (fontSize * 1.2));
             ctx.restore();
         },

@@ -62,18 +62,23 @@ class Photo extends Model
         if (str_starts_with($this->file_path, 'http')) {
             return $this->file_path;
         }
+        if ($this->id) {
+            return route('photo.view', ['photo' => $this->id]);
+        }
         return Storage::disk('public')->url($this->file_path);
     }
 
     public function getThumbnailUrlAttribute(): string
     {
+        if ($this->thumbnail_path && str_starts_with($this->thumbnail_path, 'http')) {
+            return $this->thumbnail_path;
+        }
+        if ($this->id) {
+            return route('photo.thumbnail', ['photo' => $this->id]);
+        }
         if ($this->thumbnail_path) {
-            if (str_starts_with($this->thumbnail_path, 'http')) {
-                return $this->thumbnail_path;
-            }
             return Storage::disk('public')->url($this->thumbnail_path);
         }
-
         return $this->url;
     }
 }
