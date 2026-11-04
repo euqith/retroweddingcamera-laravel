@@ -26,6 +26,14 @@
          class="fixed inset-0 bg-white z-50 pointer-events-none"
          style="display: none;"></div>
 
+    <!-- Hidden Native Camera File Input (Always works on all phones & HTTP/HTTPS) -->
+    <input type="file"
+           x-ref="nativeFileInput"
+           accept="image/*"
+           :capture="facingMode === 'user' ? 'user' : 'environment'"
+           class="hidden"
+           @change="handleNativePhoto($event)">
+
     <!-- Top Status Bar & Event Branding -->
     <header class="w-full max-w-md pt-4 px-4 flex items-center justify-between text-white/80 z-20">
         <a href="{{ route('event.landing', $event->slug) }}" class="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors">
@@ -63,7 +71,7 @@
 
             <!-- Viewfinder Area -->
             <div class="relative w-full aspect-[4/3] bg-black rounded-2xl overflow-hidden my-4 border-4 border-[#18181b] shadow-inner">
-                <!-- Video Stream -->
+                <!-- Video Stream for Live WebRTC -->
                 <video x-ref="videoElement"
                        autoplay
                        playsinline
@@ -75,7 +83,8 @@
                 <canvas x-ref="captureCanvas" class="hidden"></canvas>
 
                 <!-- Viewfinder Mask & Optical Crosshair -->
-                <div class="absolute inset-0 border border-white/20 pointer-events-none rounded-xl m-2 flex items-center justify-center">
+                <div x-show="!cameraError && !isRollEmpty"
+                     class="absolute inset-0 border border-white/20 pointer-events-none rounded-xl m-2 flex items-center justify-center">
                     <div class="w-8 h-8 border border-white/30 rounded-full flex items-center justify-center">
                         <div class="w-1.5 h-1.5 bg-white/40 rounded-full"></div>
                     </div>
@@ -84,6 +93,31 @@
                 <!-- Live Quartz Date Stamp Overlay Preview -->
                 <div class="absolute bottom-3 right-3 film-date-stamp text-xs pointer-events-none select-none">
                     '{{ date('y m d') }}
+                </div>
+
+                <!-- Camera Error / Native Mode Overlay -->
+                <div x-show="cameraError && !isRollEmpty"
+                     class="absolute inset-0 bg-[#231F1E]/95 backdrop-blur-sm flex flex-col items-center justify-center text-center p-5 text-white z-20"
+                     style="display: none;">
+                    <div class="w-10 h-10 bg-amber-500/20 text-wedding-gold rounded-full flex items-center justify-center mb-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/>
+                        </svg>
+                    </div>
+                    <p class="text-xs font-semibold text-wedding-ivory mb-1">Mode Kamera Smartphone</p>
+                    <p class="text-[11px] text-white/70 mb-3 px-2" x-text="cameraError"></p>
+
+                    <button @click="triggerNativeCamera()"
+                            type="button"
+                            class="py-2 px-4 rounded-xl bg-gradient-to-r from-wedding-gold to-wedding-goldHover text-white text-xs font-semibold shadow hover:shadow-md transition-all flex items-center space-x-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/>
+                        </svg>
+                        <span>Buka Kamera HP Langsung</span>
+                    </button>
+                    <button @click="startStream()" type="button" class="mt-2 text-[10px] text-white/40 hover:text-white underline">
+                        Coba Muat Ulang Live Kamera
+                    </button>
                 </div>
 
                 <!-- Empty Roll Overlay (36/36 reached) -->
@@ -207,6 +241,7 @@ function disposableCamera(config) {
         isFlashing: false,
         isProcessing: false,
         isWinding: false,
+        cameraError: null,
         stream: null,
         audioCtx: null,
 
@@ -237,106 +272,155 @@ function disposableCamera(config) {
         // Play synthetic realistic mechanical shutter click
         playShutterSound() {
             if (!this.audioCtx) return;
-            if (this.audioCtx.state === 'suspended') {
-                this.audioCtx.resume();
+            try {
+                if (this.audioCtx.state === 'suspended') {
+                    this.audioCtx.resume();
+                }
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(800, this.audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, this.audioCtx.currentTime + 0.04);
+                gain.gain.setValueAtTime(0.8, this.audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.04);
+                osc.connect(gain);
+                gain.connect(this.audioCtx.destination);
+                osc.start();
+                osc.stop(this.audioCtx.currentTime + 0.05);
+
+                setTimeout(() => {
+                    if (!this.audioCtx) return;
+                    const osc2 = this.audioCtx.createOscillator();
+                    const gain2 = this.audioCtx.createGain();
+                    osc2.type = 'square';
+                    osc2.frequency.setValueAtTime(600, this.audioCtx.currentTime);
+                    osc2.frequency.exponentialRampToValueAtTime(80, this.audioCtx.currentTime + 0.06);
+                    gain2.gain.setValueAtTime(0.7, this.audioCtx.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.06);
+                    osc2.connect(gain2);
+                    gain2.connect(this.audioCtx.destination);
+                    osc2.start();
+                    osc2.stop(this.audioCtx.currentTime + 0.07);
+                }, 60);
+            } catch (err) {
+                console.warn('Audio error', err);
             }
-
-            // Click 1: shutter blade opening
-            const osc = this.audioCtx.createOscillator();
-            const gain = this.audioCtx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(800, this.audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(100, this.audioCtx.currentTime + 0.04);
-            gain.gain.setValueAtTime(0.8, this.audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.04);
-            osc.connect(gain);
-            gain.connect(this.audioCtx.destination);
-            osc.start();
-            osc.stop(this.audioCtx.currentTime + 0.05);
-
-            // Click 2: shutter blade snapping shut (~60ms later)
-            setTimeout(() => {
-                if (!this.audioCtx) return;
-                const osc2 = this.audioCtx.createOscillator();
-                const gain2 = this.audioCtx.createGain();
-                osc2.type = 'square';
-                osc2.frequency.setValueAtTime(600, this.audioCtx.currentTime);
-                osc2.frequency.exponentialRampToValueAtTime(80, this.audioCtx.currentTime + 0.06);
-                gain2.gain.setValueAtTime(0.7, this.audioCtx.currentTime);
-                gain2.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.06);
-                osc2.connect(gain2);
-                gain2.connect(this.audioCtx.destination);
-                osc2.start();
-                osc2.stop(this.audioCtx.currentTime + 0.07);
-            }, 60);
         },
 
         // Play mechanical film winding sound
         playWindingSound() {
             if (!this.audioCtx) return;
-            for (let i = 0; i < 4; i++) {
-                setTimeout(() => {
-                    if (!this.audioCtx) return;
-                    const osc = this.audioCtx.createOscillator();
-                    const gain = this.audioCtx.createGain();
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(1200 - (i * 100), this.audioCtx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(300, this.audioCtx.currentTime + 0.03);
-                    gain.gain.setValueAtTime(0.3, this.audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.03);
-                    osc.connect(gain);
-                    gain.connect(this.audioCtx.destination);
-                    osc.start();
-                    osc.stop(this.audioCtx.currentTime + 0.04);
-                }, i * 70);
+            try {
+                for (let i = 0; i < 4; i++) {
+                    setTimeout(() => {
+                        if (!this.audioCtx) return;
+                        const osc = this.audioCtx.createOscillator();
+                        const gain = this.audioCtx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(1200 - (i * 100), this.audioCtx.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(300, this.audioCtx.currentTime + 0.03);
+                        gain.gain.setValueAtTime(0.3, this.audioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.03);
+                        osc.connect(gain);
+                        gain.connect(this.audioCtx.destination);
+                        osc.start();
+                        osc.stop(this.audioCtx.currentTime + 0.04);
+                    }, i * 70);
+                }
+            } catch (err) {
+                console.warn('Audio error', err);
             }
         },
 
         async startStream() {
             if (this.stream) {
                 this.stream.getTracks().forEach(track => track.stop());
+                this.stream = null;
+            }
+
+            this.cameraError = null;
+
+            // Security context check
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                this.cameraError = 'Live kamera browser memerlukan koneksi HTTPS di HP. Tekan tombol di bawah untuk memotret langsung!';
+                return;
             }
 
             try {
+                // Attempt 1: Ideal facingMode
                 const constraints = {
                     audio: false,
                     video: {
                         facingMode: { ideal: this.facingMode },
-                        width: { ideal: 1920 },
-                        height: { ideal: 1440 }
+                        width: { ideal: 1280 }
                     }
                 };
 
                 this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (err1) {
+                try {
+                    // Attempt 2: Basic facingMode
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        audio: false,
+                        video: { facingMode: this.facingMode }
+                    });
+                } catch (err2) {
+                    try {
+                        // Attempt 3: Any video device
+                        this.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    } catch (err3) {
+                        console.error('Kamera gagal diakses:', err3);
+                        if (err3.name === 'NotAllowedError' || err3.name === 'PermissionDeniedError') {
+                            this.cameraError = 'Izin kamera ditolak. Silakan izinkan akses kamera di pengaturan browser.';
+                        } else {
+                            this.cameraError = 'Live kamera tidak dapat dinyalakan. Gunakan tombol kamera langsung di bawah!';
+                        }
+                        return;
+                    }
+                }
+            }
+
+            if (this.stream && this.$refs.videoElement) {
                 this.$refs.videoElement.srcObject = this.stream;
-            } catch (err) {
-                console.error('Kamera tidak dapat diakses:', err);
-                alert('Mohon izinkan akses kamera di browser Anda untuk menggunakan kamera disposable.');
+                this.$refs.videoElement.onloadedmetadata = () => {
+                    this.$refs.videoElement.play().catch(e => console.warn('Autoplay prevented:', e));
+                };
             }
         },
 
         async flipCamera() {
             this.facingMode = this.facingMode === 'environment' ? 'user' : 'environment';
-            await this.startStream();
+            if (this.stream) {
+                await this.startStream();
+            }
         },
 
         toggleFlash() {
             this.flashEnabled = !this.flashEnabled;
         },
 
+        triggerNativeCamera() {
+            this.$refs.nativeFileInput.click();
+        },
+
+        // Triggered when user snaps photo
         async takePhoto() {
             if (this.isRollEmpty || this.isProcessing || this.isWinding) return;
+
+            // If stream is not active or error, use native camera capture
+            if (!this.stream || this.cameraError) {
+                this.triggerNativeCamera();
+                return;
+            }
 
             this.isProcessing = true;
             this.playShutterSound();
 
-            // Trigger flash simulation if enabled
             if (this.flashEnabled) {
                 this.isFlashing = true;
                 setTimeout(() => { this.isFlashing = false; }, 180);
             }
 
-            // Haptic vibration feedback on mobile
             if (navigator.vibrate) {
                 navigator.vibrate(40);
             }
@@ -350,7 +434,6 @@ function disposableCamera(config) {
             canvas.width = width;
             canvas.height = height;
 
-            // Draw video frame (mirroring if in selfie mode)
             ctx.save();
             if (this.facingMode === 'user') {
                 ctx.translate(width, 0);
@@ -359,11 +442,60 @@ function disposableCamera(config) {
             ctx.drawImage(video, 0, 0, width, height);
             ctx.restore();
 
-            // Apply Disposable Retro Film Tone (Color curve, Vignette, 35mm grain, Date Stamp)
+            // Apply Disposable Retro Film Tone
             this.applyDisposableFilter(ctx, width, height, this.flashEnabled);
 
             const imageData = canvas.toDataURL('image/jpeg', 0.88);
+            await this.uploadPhotoData(imageData);
+        },
 
+        // Handles photo taken via native device camera input
+        async handleNativePhoto(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            this.isProcessing = true;
+            this.playShutterSound();
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = async () => {
+                    const canvas = this.$refs.captureCanvas;
+                    const ctx = canvas.getContext('2d');
+
+                    // Limit max resolution for faster mobile upload
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 1920;
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        } else {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Apply Disposable Retro Film Tone
+                    this.applyDisposableFilter(ctx, width, height, this.flashEnabled);
+
+                    const imageData = canvas.toDataURL('image/jpeg', 0.88);
+                    await this.uploadPhotoData(imageData);
+                    // Reset input
+                    event.target.value = '';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        },
+
+        async uploadPhotoData(imageData) {
             try {
                 const response = await fetch(this.captureUrl, {
                     method: 'POST',
