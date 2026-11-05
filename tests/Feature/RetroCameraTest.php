@@ -534,5 +534,65 @@ class RetroCameraTest extends TestCase
         $response2->assertStatus(200);
         $response2->assertSee('showDateStamp: true', false);
     }
+
+    public function test_guest_can_access_table_card_without_login(): void
+    {
+        // Must be 200 OK without any authentication
+        $response = $this->get("/e/{$this->event->slug}/card");
+        $response->assertStatus(200);
+        $response->assertSee($this->event->title);
+        $response->assertSee('BE OUR PHOTOGRAPHER');
+        $response->assertSee('Buka Kamera &amp; Galeri Acara', false);
+
+        // Also test the alias route
+        $aliasResponse = $this->get("/e/{$this->event->slug}/qrcode");
+        $aliasResponse->assertStatus(200);
+    }
+
+    public function test_guest_landing_page_contains_card_link(): void
+    {
+        $response = $this->get("/e/{$this->event->slug}");
+        $response->assertStatus(200);
+        $response->assertSee(route('event.card', $this->event->slug));
+        $response->assertSee('Lihat &amp; Cetak Kartu Barcode Meja', false);
+    }
+
+    public function test_guest_can_capture_photo_with_summer_gold_preset(): void
+    {
+        // 1x1 transparent PNG as Data URI
+        $dummyBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+        $response = $this->postJson("/e/{$this->event->slug}/camera/capture", [
+            'image' => $dummyBase64,
+            'filter_applied' => 'summer_gold',
+        ], [
+            'X-Device-Token' => 'DEVICE-SUMMER-GOLD',
+        ]);
+
+        $response->assertStatus(200);
+        $photo = Photo::find($response->json('photo.id'));
+        $this->assertNotNull($photo);
+        $this->assertEquals('summer_gold', $photo->filter_applied);
+    }
+
+    public function test_admin_can_create_event_with_summer_gold_preset(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        $response = $this->post('/admin/events', [
+            'title' => 'Summer Wedding Event',
+            'slug' => 'summer-wedding',
+            'event_type' => 'wedding',
+            'theme_preset' => 'sacred_olive',
+            'filter_preset' => 'summer_gold',
+            'max_shots_per_device' => 36,
+            'is_active' => '1',
+        ]);
+
+        $response->assertRedirect();
+        $event = Event::where('slug', 'summer-wedding')->first();
+        $this->assertNotNull($event);
+        $this->assertEquals('summer_gold', $event->filter_preset);
+    }
 }
 

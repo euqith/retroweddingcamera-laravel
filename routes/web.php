@@ -33,6 +33,8 @@ Route::prefix('e/{slug}')->group(function () {
     Route::get('/camera', [EventController::class, 'camera'])->name('event.camera');
     Route::post('/camera/capture', [EventController::class, 'capture'])->name('event.camera.capture')->middleware('throttle:30,1');
     Route::get('/gallery', [EventController::class, 'gallery'])->name('event.gallery');
+    Route::get('/card', [EventController::class, 'card'])->name('event.card');
+    Route::get('/qrcode', [EventController::class, 'card'])->name('event.qrcode');
 });
 
 // Admin & Organizer Routes (Strictly Authenticated)

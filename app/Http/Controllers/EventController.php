@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use ZipArchive;
 
 class EventController extends Controller
@@ -134,7 +135,7 @@ class EventController extends Controller
             'image' => ['required', 'string', 'starts_with:data:image/'],
             'camera_facing' => 'nullable|string|in:environment,user',
             'flash_enabled' => 'nullable|boolean',
-            'filter_applied' => 'nullable|string|in:fuji_quicksnap,kodak_funsaver,warm_portra,ilford_bw,cinestill_800t,agfa_vista,lomography_color',
+            'filter_applied' => 'nullable|string|in:fuji_quicksnap,kodak_funsaver,warm_portra,ilford_bw,cinestill_800t,agfa_vista,lomography_color,summer_gold',
             'caption' => 'nullable|string|max:255',
         ]);
 
@@ -244,6 +245,24 @@ class EventController extends Controller
         }
 
         return $this->serveDemoFallbackPhoto($photo->shot_number);
+    }
+
+    /**
+     * Public Printable Table Card & QR Code (Accessible without login)
+     */
+    public function card(string $slug)
+    {
+        $event = Event::where('slug', $slug)->where('is_active', true)->firstOrFail();
+        $landingUrl = $event->landing_url;
+        $cameraUrl = $event->camera_url;
+        $galleryUrl = $event->gallery_url;
+
+        // Generate SVG inline strings for instant crisp rendering
+        $landingQrSvg = QrCode::size(280)->margin(1)->generate($landingUrl);
+        $cameraQrSvg = QrCode::size(260)->margin(1)->generate($cameraUrl);
+        $galleryQrSvg = QrCode::size(260)->margin(1)->generate($galleryUrl);
+
+        return view('events.card', compact('event', 'landingUrl', 'cameraUrl', 'galleryUrl', 'landingQrSvg', 'cameraQrSvg', 'galleryQrSvg'));
     }
 
     /**

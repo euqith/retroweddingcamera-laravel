@@ -127,10 +127,25 @@
             <span>Lihat Galeri Bersama ({{ $photosCount }} Foto)</span>
         </a>
 
-        <div class="pt-4 flex items-center justify-center space-x-4 text-xs text-wedding-subtle">
-            <a href="{{ route('admin.dashboard') }}" class="hover:text-wedding-gold transition-colors">Admin Dashboard</a>
+        <!-- Public Table Card & QR Code Link -->
+        <a href="{{ route('event.card', $event->slug) }}"
+           class="w-full py-3 px-6 rounded-2xl border border-wedding-gold/30 text-wedding-dark/80 bg-wedding-ivory/50 hover:bg-wedding-linen font-medium text-xs transition-all flex items-center justify-center space-x-2 shadow-xs">
+            <span>📄</span>
+            <span>Lihat &amp; Cetak Kartu Barcode Meja</span>
+            <span class="text-wedding-gold">➔</span>
+        </a>
+
+        <div class="pt-4 flex items-center justify-center space-x-3 text-xs text-wedding-subtle">
+            <a href="{{ route('event.card', $event->slug) }}" class="hover:text-wedding-gold transition-colors flex items-center space-x-1">
+                <span>📄</span>
+                <span>Kartu Meja &amp; Barcode</span>
+            </a>
             <span>•</span>
-            <a href="{{ route('admin.events.qrcodes', $event) }}" class="hover:text-wedding-gold transition-colors">Lihat QR Code</a>
+            @auth
+                <a href="{{ route('admin.dashboard') }}" class="hover:text-wedding-gold transition-colors">Admin Dashboard</a>
+            @else
+                <a href="{{ route('login') }}" class="hover:text-wedding-gold transition-colors">Login Admin</a>
+            @endauth
         </div>
     </div>
 </div>

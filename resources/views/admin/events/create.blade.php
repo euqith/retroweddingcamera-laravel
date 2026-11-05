@@ -120,6 +120,7 @@
                     <label class="block text-xs font-semibold uppercase tracking-wider text-wedding-dark mb-2">Simulasi Tone Film *</label>
                     <select name="filter_preset" required class="w-full px-4 py-3 rounded-xl border border-wedding-gold/30 text-sm bg-wedding-ivory/30">
                         <option value="fuji_quicksnap" {{ old('filter_preset') === 'fuji_quicksnap' ? 'selected' : '' }}>Fuji QuickSnap 400 (Clean, Emerald Shadows, High Whites)</option>
+                        <option value="summer_gold" {{ old('filter_preset') === 'summer_gold' ? 'selected' : '' }}>Kodak Gold 200 (Summer Riviera, Pastel Teal Sky & Warm Sand)</option>
                         <option value="kodak_funsaver" {{ old('filter_preset') === 'kodak_funsaver' ? 'selected' : '' }}>Kodak FunSaver 800 (Golden Warm Amber, Gritty Coarse Grain)</option>
                         <option value="warm_portra" {{ old('filter_preset') === 'warm_portra' ? 'selected' : '' }}>Kodak Portra 400 (Soft Pastel Skin Tones, Fine Art Wedding)</option>
                         <option value="ilford_bw" {{ old('filter_preset') === 'ilford_bw' ? 'selected' : '' }}>Ilford HP5 Plus 400 (Classic Monochrome Black & White)</option>

@@ -47,7 +47,7 @@ class AdminController extends Controller
             'location' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'theme_preset' => 'required|string|in:ivory_gold,sacred_olive,classic_film',
-            'filter_preset' => 'required|string|in:fuji_quicksnap,kodak_funsaver,warm_portra,ilford_bw,cinestill_800t,agfa_vista,lomography_color',
+            'filter_preset' => 'required|string|in:fuji_quicksnap,kodak_funsaver,warm_portra,ilford_bw,cinestill_800t,agfa_vista,lomography_color,summer_gold',
             'show_date_stamp' => 'nullable|boolean',
             'max_shots_per_device' => 'required|integer|min:1|max:100',
             'is_active' => 'nullable|boolean',
@@ -99,7 +99,7 @@ class AdminController extends Controller
             'location' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'theme_preset' => 'required|string|in:ivory_gold,sacred_olive,classic_film',
-            'filter_preset' => 'required|string|in:fuji_quicksnap,kodak_funsaver,warm_portra,ilford_bw,cinestill_800t,agfa_vista,lomography_color',
+            'filter_preset' => 'required|string|in:fuji_quicksnap,kodak_funsaver,warm_portra,ilford_bw,cinestill_800t,agfa_vista,lomography_color,summer_gold',
             'show_date_stamp' => 'nullable|boolean',
             'max_shots_per_device' => 'required|integer|min:1|max:100',
         ]);
@@ -152,11 +152,11 @@ class AdminController extends Controller
         $galleryUrl = $event->gallery_url;
 
         // Generate SVG inline strings for instant crisp rendering
-        $landingQrSvg = QrCode::size(280)->margin(1)->generate($landingUrl);
-        $cameraQrSvg = QrCode::size(260)->margin(1)->generate($cameraUrl);
-        $galleryQrSvg = QrCode::size(260)->margin(1)->generate($galleryUrl);
+        $landingQrSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(280)->margin(1)->generate($landingUrl);
+        $cameraQrSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(260)->margin(1)->generate($cameraUrl);
+        $galleryQrSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(260)->margin(1)->generate($galleryUrl);
 
-        return view('admin.events.qrcodes', compact('event', 'landingUrl', 'cameraUrl', 'galleryUrl', 'landingQrSvg', 'cameraQrSvg', 'galleryQrSvg'));
+        return view('events.card', compact('event', 'landingUrl', 'cameraUrl', 'galleryUrl', 'landingQrSvg', 'cameraQrSvg', 'galleryQrSvg'));
     }
 
     /**

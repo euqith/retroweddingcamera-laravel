@@ -79,6 +79,15 @@ class ImageProcessingService
     public function applyFilmPreset($image, string $preset): void
     {
         switch ($preset) {
+            case 'summer_gold':
+                // Kodak Gold 200 (Summer Riviera):
+                // Soft golden sand highlights, pastel teal/cyan skies, gentle contrast and lifted matte shadows
+                $image->contrast(14);
+                $image->colorize(6, 12, -8);
+                $image->gamma(1.04);
+                $image->brightness(2);
+                break;
+
             case 'lomography_color':
                 // Rich cross-process toy camera: punchy contrast, deep saturated warm amber/orange-brown, rich shadows
                 $image->contrast(28);

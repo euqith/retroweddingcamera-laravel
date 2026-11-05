@@ -299,7 +299,7 @@
                     <button @click="showFilmModal = true"
                             type="button"
                             class="text-[10px] text-wedding-gold hover:text-wedding-goldHover font-bold tracking-wider uppercase underline">
-                        Semua (7) ➔
+                        Semua (8) ➔
                     </button>
                 </div>
                 <div class="flex items-center space-x-2 overflow-x-auto py-1 px-0.5 no-scrollbar">
@@ -610,9 +610,10 @@ function disposableCamera(config) {
             }
         })(),
 
-        // 7 Rich Authentic Vintage Analog Film Stock Recipes
+        // 8 Rich Authentic Vintage Analog Film Stock Recipes
         filmPresets: [
             { id: 'fuji_quicksnap', name: 'Fuji QuickSnap 400', badge: 'FUJI 400', tag: 'Natural & Emerald Shadows', desc: 'Tone sejuk jernih, shadow emerald & highlight putih pop khas kamera sekali pakai legendaris' },
+            { id: 'summer_gold', name: 'Kodak Gold 200', badge: 'GOLD 200', tag: 'Pastel Teal Sky & Warm Sand', desc: 'Langit toska pastel, pasir emas hangat & pesona nostalgia liburan musim panas' },
             { id: 'kodak_funsaver', name: 'Kodak FunSaver 800', badge: 'KODAK 800', tag: 'Warm Amber & Coarse Grain', desc: 'Nuansa emas hangat, warna merah-kuning kaya, dan butiran grain kasar ISO 800' },
             { id: 'warm_portra', name: 'Kodak Portra 400', badge: 'PORTRA 400', tag: 'Soft Pastel Skin Tones', desc: 'Tone warna kulit lembut & creamy, kontras halus sangat cocok untuk momen wedding' },
             { id: 'ilford_bw', name: 'Ilford HP5 Plus 400', badge: 'ILFORD B&W', tag: 'Classic Silver Monochrome', desc: 'Hitam putih analog kontras tinggi dengan gradasi perak dramatis & grain klasik' },
@@ -637,6 +638,9 @@ function disposableCamera(config) {
             switch (preset) {
                 case 'ilford_bw':
                     return 'grayscale(100%) contrast(1.35) brightness(0.96)';
+                case 'summer_gold':
+                    // Kodak Gold 200 (Summer Riviera): pastel teal sky, golden sunshine, soft matte shadows
+                    return 'sepia(0.18) saturate(1.24) contrast(1.14) brightness(1.04) hue-rotate(-8deg)';
                 case 'kodak_funsaver':
                     // Warm golden amber, rich tone rolloff
                     return 'sepia(0.24) saturate(1.28) contrast(1.24) brightness(1.02) hue-rotate(-10deg)';
@@ -670,6 +674,7 @@ function disposableCamera(config) {
 
         getDateColor() {
             switch (this.currentPreset) {
+                case 'summer_gold': return '#FFAA22';
                 case 'ilford_bw': return '#EAEAEA';
                 case 'kodak_funsaver': return '#FF7700';
                 case 'warm_portra': return '#FFB866';
@@ -1163,6 +1168,7 @@ function disposableCamera(config) {
             // 2. Subtle Authentic 35mm Analog Film Grain (Centered at 128 mid-gray, no milky wash)
             let grainAlpha = 0.09;
             switch (preset) {
+                case 'summer_gold': grainAlpha = 0.08; break;
                 case 'kodak_funsaver': grainAlpha = 0.12; break;
                 case 'warm_portra': grainAlpha = 0.07; break;
                 case 'ilford_bw': grainAlpha = 0.14; break;
