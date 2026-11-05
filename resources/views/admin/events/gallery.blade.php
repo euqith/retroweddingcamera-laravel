@@ -45,9 +45,9 @@
                     <span>Buka Tampilan Tamu</span>
                 </a>
 
-                <a href="{{ route('admin.events.qrcodes', $event) }}"
+                <a href="{{ route('event.card', $event->slug) }}" target="_blank"
                    class="px-3.5 py-2 bg-wedding-dark hover:bg-black text-white text-xs font-semibold rounded-xl transition-colors flex items-center space-x-1.5 shadow">
-                    <span>QR Code</span>
+                    <span>Kartu Barcode</span>
                 </a>
             </div>
         </div>

@@ -50,15 +50,16 @@
 <div x-data="{
         cardMode: 'single',
         copied: false,
+        publicCardUrl: '{{ route('event.card', $event->slug) }}',
         shareCard() {
             if (navigator.share) {
                 navigator.share({
                     title: 'Kartu Barcode Meja — {{ addslashes($event->title) }}',
                     text: 'Buka atau cetak kartu barcode meja acara {{ addslashes($event->title) }} untuk memotret & melihat galeri foto bersama.',
-                    url: window.location.href,
+                    url: this.publicCardUrl,
                 }).catch(() => {});
             } else {
-                navigator.clipboard.writeText(window.location.href);
+                navigator.clipboard.writeText(this.publicCardUrl);
                 this.copied = true;
                 setTimeout(() => this.copied = false, 2500);
             }
@@ -293,9 +294,22 @@
 
         <!-- Direct URLs Copy Helper (No Print) -->
         <div class="no-print bg-white rounded-2xl border border-wedding-gold/20 p-6 max-w-xl mx-auto shadow-sm">
-            <h3 class="text-xs uppercase tracking-wider text-wedding-subtle font-bold mb-4">Tautan Langsung Acara:</h3>
+            <h3 class="text-xs uppercase tracking-wider text-wedding-subtle font-bold mb-4">Tautan Langsung Acara (Siap Dibagikan):</h3>
             
             <div class="space-y-3">
+                <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-[11px] font-bold text-emerald-900">🌟 URL Halaman Kartu Ini (Publik / Tanpa Login):</label>
+                        <span class="text-[10px] text-emerald-700 font-semibold">Bisa Dibagikan</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="text" readonly :value="publicCardUrl" class="w-full text-xs font-mono bg-white border border-emerald-300 px-3 py-2 rounded-lg select-all text-emerald-950 font-bold">
+                        <button @click="shareCard()" type="button" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap shadow-xs">
+                            <span x-text="copied ? '✅ Disalin' : 'Salin'"></span>
+                        </button>
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-[11px] font-semibold text-wedding-dark mb-1">1. URL Portal Acara (Kamera &amp; Galeri):</label>
                     <div class="flex items-center space-x-2">
@@ -324,3 +338,4 @@
     </div>
 </div>
 @endsection
+

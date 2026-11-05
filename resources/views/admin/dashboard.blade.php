@@ -110,9 +110,9 @@
                                     <span>Galeri Event ({{ $event->photos_count }})</span>
                                 </a>
 
-                                <a href="{{ route('admin.events.qrcodes', $event) }}"
+                                <a href="{{ route('event.card', $event->slug) }}" target="_blank"
                                    class="px-3 py-1.5 bg-wedding-gold/15 hover:bg-wedding-gold/30 text-wedding-goldHover text-xs font-semibold rounded-lg transition-colors flex items-center space-x-1">
-                                    <span>QR Codes</span>
+                                    <span>Kartu Barcode</span>
                                 </a>
 
                                 <a href="{{ route('admin.events.sessions', $event) }}"

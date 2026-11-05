@@ -72,7 +72,7 @@ class AdminController extends Controller
 
         $event = Event::create($validated);
 
-        return redirect()->route('admin.events.qrcodes', $event)
+        return redirect()->route('event.card', $event->slug)
             ->with('success', "Event '{$event->title}' berhasil dibuat! Silakan unduh atau cetak QR Code.");
     }
 

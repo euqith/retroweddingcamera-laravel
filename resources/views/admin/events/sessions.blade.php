@@ -21,8 +21,8 @@
                 <a href="{{ route('admin.events.gallery', $event) }}" class="px-3.5 py-2 rounded-xl bg-white border border-wedding-gold/20 hover:bg-wedding-linen text-wedding-dark text-xs font-semibold shadow-xs transition-colors">
                     Galeri Event
                 </a>
-                <a href="{{ route('admin.events.qrcodes', $event) }}" class="px-3.5 py-2 rounded-xl bg-wedding-dark hover:bg-black text-white text-xs font-semibold shadow transition-colors">
-                    QR Codes
+                <a href="{{ route('event.card', $event->slug) }}" target="_blank" class="px-3.5 py-2 rounded-xl bg-wedding-dark hover:bg-black text-white text-xs font-semibold shadow transition-colors">
+                    Kartu Barcode
                 </a>
             </div>
         </div>
