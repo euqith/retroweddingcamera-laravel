@@ -5,9 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\CameraSession;
 use App\Models\Event;
 use App\Models\Photo;
+use App\Services\GoogleDriveService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use ZipArchive;
 
 class AdminController extends Controller
 {
@@ -52,6 +56,7 @@ class AdminController extends Controller
             'max_shots_per_device' => 'required|integer|min:1|max:100',
             'is_active' => 'nullable|boolean',
             'is_gallery_public' => 'nullable|boolean',
+            'google_drive_url' => 'nullable|string|max:500',
         ]);
 
         if (empty($validated['slug'])) {
@@ -61,6 +66,14 @@ class AdminController extends Controller
         $validated['show_date_stamp'] = $request->has('show_date_stamp');
         $validated['is_active'] = $request->has('is_active');
         $validated['is_gallery_public'] = $request->has('is_gallery_public');
+
+        if (!empty($validated['google_drive_url'])) {
+            $validated['google_drive_url'] = trim($validated['google_drive_url']);
+            $validated['google_drive_folder_id'] = app(GoogleDriveService::class)->extractFolderId($validated['google_drive_url']);
+        } else {
+            $validated['google_drive_url'] = null;
+            $validated['google_drive_folder_id'] = null;
+        }
 
         // Explicitly parse in Asia/Jakarta timezone (WIB)
         if (!empty($validated['starts_at'])) {
@@ -102,11 +115,20 @@ class AdminController extends Controller
             'filter_preset' => 'required|string|in:fuji_quicksnap,kodak_funsaver,warm_portra,ilford_bw,cinestill_800t,agfa_vista,lomography_color,summer_gold',
             'show_date_stamp' => 'nullable|boolean',
             'max_shots_per_device' => 'required|integer|min:1|max:100',
+            'google_drive_url' => 'nullable|string|max:500',
         ]);
 
         $validated['show_date_stamp'] = $request->has('show_date_stamp');
         $validated['is_active'] = $request->has('is_active');
         $validated['is_gallery_public'] = $request->has('is_gallery_public');
+
+        if (!empty($validated['google_drive_url'])) {
+            $validated['google_drive_url'] = trim($validated['google_drive_url']);
+            $validated['google_drive_folder_id'] = app(GoogleDriveService::class)->extractFolderId($validated['google_drive_url']);
+        } else {
+            $validated['google_drive_url'] = null;
+            $validated['google_drive_folder_id'] = null;
+        }
 
         // Explicitly parse in Asia/Jakarta timezone (WIB)
         if (!empty($validated['starts_at'])) {
@@ -162,10 +184,141 @@ class AdminController extends Controller
     /**
      * View and moderate photos for a specific event
      */
-    public function gallery(Event $event)
+    public function gallery(Event $event, GoogleDriveService $driveService)
     {
         $photos = $event->photos()->latest('taken_at')->paginate(24);
-        return view('admin.events.gallery', compact('event', 'photos'));
+        $driveConfigured = $driveService->isConfigured();
+        $serviceAccountEmail = $driveService->getServiceAccountEmail();
+
+        return view('admin.events.gallery', compact('event', 'photos', 'driveConfigured', 'serviceAccountEmail'));
+    }
+
+    /**
+     * Register or update Google Drive folder and trigger copy/sync.
+     */
+    public function updateGoogleDrive(Request $request, Event $event, GoogleDriveService $driveService)
+    {
+        $validated = $request->validate([
+            'google_drive_url' => 'required|string|max:500',
+        ]);
+
+        $url = trim($validated['google_drive_url']);
+        $folderId = $driveService->extractFolderId($url);
+
+        if (!$folderId) {
+            return back()->with('error', 'Format URL Google Drive tidak valid. Pastikan link berupa folder Google Drive yang valid.');
+        }
+
+        $event->update([
+            'google_drive_url' => $url,
+            'google_drive_folder_id' => $folderId,
+            'google_drive_sync_status' => 'idle',
+        ]);
+
+        // Immediately trigger sync
+        $syncResult = $driveService->syncEventPhotos($event);
+
+        if ($syncResult['success']) {
+            return back()->with('success', $syncResult['message']);
+        } elseif (!empty($syncResult['requires_credentials'])) {
+            return back()->with('info', $syncResult['message']);
+        } else {
+            return back()->with('warning', $syncResult['message']);
+        }
+    }
+
+    /**
+     * Manually re-sync/copy all event photos to Google Drive.
+     */
+    public function syncGoogleDrive(Event $event, GoogleDriveService $driveService)
+    {
+        if (empty($event->google_drive_url) && empty($event->google_drive_folder_id)) {
+            return back()->with('error', 'Belum ada link Google Drive yang terdaftar untuk event ini.');
+        }
+
+        $syncResult = $driveService->syncEventPhotos($event);
+
+        if ($syncResult['success']) {
+            return back()->with('success', $syncResult['message']);
+        } elseif (!empty($syncResult['requires_credentials'])) {
+            return back()->with('info', $syncResult['message']);
+        } else {
+            return back()->with('error', $syncResult['message']);
+        }
+    }
+
+    /**
+     * Disconnect Google Drive folder from event.
+     */
+    public function disconnectGoogleDrive(Event $event)
+    {
+        $event->update([
+            'google_drive_url' => null,
+            'google_drive_folder_id' => null,
+            'google_drive_sync_status' => 'idle',
+            'google_drive_synced_at' => null,
+            'google_drive_synced_count' => 0,
+            'google_drive_last_error' => null,
+        ]);
+
+        return back()->with('success', 'Tautan Google Drive berhasil diputuskan.');
+    }
+
+    /**
+     * Download all event photos as a ZIP file.
+     */
+    public function downloadZip(Event $event)
+    {
+        $photos = $event->photos()->orderBy('shot_number')->get();
+        if ($photos->isEmpty()) {
+            return back()->with('error', 'Belum ada foto yang diambil pada event ini untuk diunduh.');
+        }
+
+        $zipFilename = 'photos_' . Str::slug($event->title) . '_' . date('Ymd_His') . '.zip';
+        $tempDir = storage_path('app/temp');
+        if (!File::isDirectory($tempDir)) {
+            File::makeDirectory($tempDir, 0755, true);
+        }
+        $zipPath = $tempDir . '/' . $zipFilename;
+
+        $zip = new ZipArchive();
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            return back()->with('error', 'Gagal membuat file ZIP di server.');
+        }
+
+        $disk = Storage::disk('public');
+        $added = 0;
+
+        foreach ($photos as $photo) {
+            $name = "shot_{$photo->shot_number}_" . ($photo->taken_at ? $photo->taken_at->format('Ymd_His') : date('Ymd_His')) . ".jpg";
+            if ($photo->file_path && $disk->exists($photo->file_path)) {
+                $zip->addFromString($name, $disk->get($photo->file_path));
+                $added++;
+            } else {
+                // Check fallback demo attachments
+                $attachmentMap = [
+                    1 => 'IMG_2820.JPG',
+                    2 => 'IMG_2821.JPG',
+                    3 => 'IMG_2823.JPG',
+                    4 => 'IMG_2825.JPG',
+                    5 => 'IMG_2831.JPG',
+                    6 => 'IMG_2832.JPG',
+                ];
+                $fallbackFile = base_path('attachment/' . ($attachmentMap[((abs($photo->shot_number - 1)) % 6) + 1] ?? 'IMG_2820.JPG'));
+                if (file_exists($fallbackFile)) {
+                    $zip->addFile($fallbackFile, $name);
+                    $added++;
+                }
+            }
+        }
+
+        $zip->close();
+
+        if ($added === 0 || !file_exists($zipPath)) {
+            return back()->with('error', 'Tidak ada file fisik foto yang dapat dikompresi.');
+        }
+
+        return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);
     }
 
     /**

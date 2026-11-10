@@ -52,6 +52,12 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
     // Separated Event Photo Gallery Manager
     Route::get('/events/{event}/gallery', [AdminController::class, 'gallery'])->name('events.gallery');
     Route::post('/events/{event}/gallery/clear', [AdminController::class, 'clearEventPhotos'])->name('events.gallery.clear');
+    Route::get('/events/{event}/download-zip', [AdminController::class, 'downloadZip'])->name('events.download-zip');
+
+    // Google Drive Integration & Sync
+    Route::post('/events/{event}/google-drive', [AdminController::class, 'updateGoogleDrive'])->name('events.google-drive.update');
+    Route::post('/events/{event}/google-drive/sync', [AdminController::class, 'syncGoogleDrive'])->name('events.google-drive.sync');
+    Route::match(['post', 'delete'], '/events/{event}/google-drive/disconnect', [AdminController::class, 'disconnectGoogleDrive'])->name('events.google-drive.disconnect');
 
     // Device Sessions Monitor (Read-Only)
     Route::get('/events/{event}/sessions', [AdminController::class, 'sessions'])->name('events.sessions');

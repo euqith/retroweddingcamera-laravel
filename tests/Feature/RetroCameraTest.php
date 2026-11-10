@@ -594,5 +594,106 @@ class RetroCameraTest extends TestCase
         $this->assertNotNull($event);
         $this->assertEquals('summer_gold', $event->filter_preset);
     }
+
+    public function test_admin_can_create_event_with_google_drive_url(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        $response = $this->post('/admin/events', [
+            'title' => 'Drive Linked Event',
+            'slug' => 'drive-linked-event',
+            'event_type' => 'general',
+            'theme_preset' => 'classic_film',
+            'filter_preset' => 'lomography_color',
+            'max_shots_per_device' => 24,
+            'is_active' => '1',
+            'google_drive_url' => 'https://drive.google.com/drive/folders/0B_xyz987FolderId',
+        ]);
+
+        $response->assertRedirect();
+        $event = Event::where('slug', 'drive-linked-event')->first();
+        $this->assertNotNull($event);
+        $this->assertEquals('https://drive.google.com/drive/folders/0B_xyz987FolderId', $event->google_drive_url);
+        $this->assertEquals('0B_xyz987FolderId', $event->google_drive_folder_id);
+    }
+
+    public function test_admin_can_register_google_drive_url(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        $response = $this->post("/admin/events/{$this->event->id}/google-drive", [
+            'google_drive_url' => 'https://drive.google.com/drive/folders/1aBcDeFgHiJkLmNoPqRsTuVwXyZ123456?usp=sharing',
+        ]);
+
+        $response->assertRedirect();
+        $this->event->refresh();
+
+        $this->assertEquals('https://drive.google.com/drive/folders/1aBcDeFgHiJkLmNoPqRsTuVwXyZ123456?usp=sharing', $this->event->google_drive_url);
+        $this->assertEquals('1aBcDeFgHiJkLmNoPqRsTuVwXyZ123456', $this->event->google_drive_folder_id);
+    }
+
+    public function test_admin_can_disconnect_google_drive(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        $this->event->update([
+            'google_drive_url' => 'https://drive.google.com/drive/folders/1aBcDeFgHiJkLmNoPqRsTuVwXyZ123456',
+            'google_drive_folder_id' => '1aBcDeFgHiJkLmNoPqRsTuVwXyZ123456',
+            'google_drive_sync_status' => 'completed',
+        ]);
+
+        $response = $this->post("/admin/events/{$this->event->id}/google-drive/disconnect");
+
+        $response->assertRedirect();
+        $this->event->refresh();
+
+        $this->assertNull($this->event->google_drive_url);
+        $this->assertNull($this->event->google_drive_folder_id);
+        $this->assertEquals('idle', $this->event->google_drive_sync_status);
+    }
+
+    public function test_admin_can_download_photos_zip(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        $session = CameraSession::create([
+            'event_id' => $this->event->id,
+            'device_token' => 'DEVICE-ZIP-TEST',
+            'shots_taken' => 1,
+            'max_shots' => 36,
+        ]);
+
+        // Put a dummy photo in storage
+        Storage::disk('public')->put("photos/{$this->event->slug}/test_shot.jpg", 'dummy-image-binary-data');
+
+        Photo::create([
+            'event_id' => $this->event->id,
+            'camera_session_id' => $session->id,
+            'shot_number' => 1,
+            'file_path' => "photos/{$this->event->slug}/test_shot.jpg",
+            'thumbnail_path' => "photos/{$this->event->slug}/test_shot_thumb.jpg",
+            'filter_applied' => 'fuji_quicksnap',
+            'taken_at' => now(),
+        ]);
+
+        $response = $this->get("/admin/events/{$this->event->id}/download-zip");
+
+        $response->assertStatus(200);
+        $this->assertTrue(str_contains($response->headers->get('content-disposition') ?? '', '.zip'));
+    }
+
+    public function test_guest_gallery_displays_google_drive_button_when_configured(): void
+    {
+        $this->event->update([
+            'google_drive_url' => 'https://drive.google.com/drive/folders/1aBcDeFgHiJkLmNoPqRsTuVwXyZ123456',
+            'google_drive_folder_id' => '1aBcDeFgHiJkLmNoPqRsTuVwXyZ123456',
+        ]);
+
+        $response = $this->get("/e/{$this->event->slug}/gallery");
+
+        $response->assertStatus(200);
+        $response->assertSee('Buka Folder Google Drive Acara', false);
+        $response->assertSee('https://drive.google.com/drive/folders/1aBcDeFgHiJkLmNoPqRsTuVwXyZ123456');
+    }
 }
 

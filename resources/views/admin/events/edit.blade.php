@@ -158,6 +158,22 @@
                           class="w-full px-4 py-3 rounded-xl border border-wedding-gold/30 text-sm bg-wedding-ivory/30">{{ old('description', $event->description) }}</textarea>
             </div>
 
+            <!-- Google Drive Folder Link -->
+            <div class="p-4 rounded-2xl bg-wedding-linen/40 border border-wedding-gold/30">
+                <div class="flex items-center space-x-2 mb-1.5">
+                    <span class="text-base">📁</span>
+                    <label class="text-xs font-bold uppercase tracking-wider text-wedding-dark">
+                        Link Folder Google Drive (Opsional)
+                    </label>
+                </div>
+                <input type="url" name="google_drive_url" value="{{ old('google_drive_url', $event->google_drive_url) }}"
+                       placeholder="https://drive.google.com/drive/folders/1abcXYZ..."
+                       class="w-full px-4 py-2.5 rounded-xl border border-wedding-gold/30 focus:border-wedding-gold text-xs sm:text-sm bg-white">
+                <p class="text-[11px] text-wedding-subtle mt-1.5">
+                    Folder Google Drive publik untuk mencadangkan seluruh foto acara. Anda juga dapat mengelola sinkronisasi langsung di Galeri Event.
+                </p>
+            </div>
+
             <!-- Options -->
             <div class="space-y-3 pt-2">
                 <div class="p-3.5 rounded-xl bg-wedding-ivory/60 border border-wedding-gold/25">

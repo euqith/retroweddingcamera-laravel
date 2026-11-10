@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'google' => [
+        'service_account_json' => env('GOOGLE_SERVICE_ACCOUNT_JSON'),
+        'service_account_file' => env('GOOGLE_SERVICE_ACCOUNT_FILE', storage_path('app/google-service-account.json')),
+        'drive_webhook_url' => env('GOOGLE_DRIVE_WEBHOOK_URL'),
+    ],
+
 ];

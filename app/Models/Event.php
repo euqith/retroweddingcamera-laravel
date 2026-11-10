@@ -29,6 +29,12 @@ class Event extends Model
         'max_shots_per_device',
         'is_active',
         'is_gallery_public',
+        'google_drive_url',
+        'google_drive_folder_id',
+        'google_drive_sync_status',
+        'google_drive_synced_at',
+        'google_drive_synced_count',
+        'google_drive_last_error',
     ];
 
     protected $casts = [
@@ -39,6 +45,8 @@ class Event extends Model
         'max_shots_per_device' => 'integer',
         'is_active' => 'boolean',
         'is_gallery_public' => 'boolean',
+        'google_drive_synced_at' => 'datetime',
+        'google_drive_synced_count' => 'integer',
     ];
 
     public static function boot()
