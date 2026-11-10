@@ -249,37 +249,124 @@
                 </div>
 
                 <!-- Guidance Accordion / Notes -->
-                <div class="mt-5 pt-4 border-t border-wedding-gold/10">
-                    <details class="group text-xs text-wedding-subtle cursor-pointer">
+                <div class="mt-5 pt-4 border-t border-wedding-gold/10" x-data="{ guideTab: 'appscript', copied: false }">
+                    <details class="group text-xs text-wedding-subtle cursor-pointer" {{ empty($driveConfigured) ? 'open' : '' }}>
                         <summary class="font-semibold text-wedding-dark flex items-center justify-between list-none select-none">
                             <span class="flex items-center space-x-1.5">
                                 <svg class="w-4 h-4 text-wedding-gold" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"/>
                                 </svg>
-                                <span>Bagaimana cara kerja sinkronisasi otomatis Google Drive?</span>
+                                <span>Petunjuk Mengaktifkan Sinkronisasi Otomatis Google Drive</span>
                             </span>
                             <span class="text-xs transition-transform group-open:rotate-180">▾</span>
                         </summary>
-                        <div class="mt-3 pl-5 space-y-2 text-[11px] leading-relaxed text-wedding-subtle">
-                            <p>
-                                1. Google Drive membutuhkan otentikasi API resmi untuk mengunggah file ke dalam folder cloud secara otomatis (bahkan folder yang berstatus public sekalipun).
-                            </p>
-                            @if(!empty($serviceAccountEmail))
-                                <p class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
-                                    <strong>Google Service Account aktif terdeteksi:</strong> Bagikan (Share) folder Google Drive Anda ke email berikut dengan akses <strong>Editor</strong>:<br>
-                                    <code class="font-mono font-bold select-all bg-white px-1.5 py-0.5 rounded text-emerald-950 mt-1 inline-block">{{ $serviceAccountEmail }}</code>
+
+                        <div class="mt-4 pt-3 border-t border-wedding-gold/10 space-y-4">
+                            <!-- Tab Switcher -->
+                            <div class="flex items-center space-x-2 border-b border-wedding-gold/20 pb-2">
+                                <button type="button" @click="guideTab = 'appscript'"
+                                        :class="guideTab === 'appscript' ? 'bg-wedding-dark text-white shadow-xs' : 'bg-wedding-ivory text-wedding-subtle hover:text-wedding-dark'"
+                                        class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all">
+                                    ⚡ Opsi 1: Google Apps Script (2 Menit, Termudah)
+                                </button>
+                                <button type="button" @click="guideTab = 'gcp'"
+                                        :class="guideTab === 'gcp' ? 'bg-wedding-dark text-white shadow-xs' : 'bg-wedding-ivory text-wedding-subtle hover:text-wedding-dark'"
+                                        class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all">
+                                    🏢 Opsi 2: GCP Service Account
+                                </button>
+                            </div>
+
+                            <!-- Opsi 1: Google Apps Script -->
+                            <div x-show="guideTab === 'appscript'" class="space-y-3 text-[11px] leading-relaxed text-wedding-subtle">
+                                <p class="text-wedding-dark font-medium">
+                                    Gunakan akun Google biasa (Gmail / Google Workspace). Tidak memerlukan Google Cloud Console, kartu kredit, ataupun konfigurasi rumit.
                                 </p>
-                            @else
-                                <p class="p-2.5 rounded-xl bg-wedding-linen border border-wedding-gold/30 text-wedding-dark">
-                                    <strong>Konfigurasi Server:</strong> Untuk mengaktifkan upload otomatis tanpa campur tangan manual, tambahkan <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> di file <code>.env</code> server, lalu bagikan folder ke email Service Account tersebut sebagai Editor.
+                                <ol class="list-decimal list-inside space-y-2 pl-1">
+                                    <li>Buka <a href="https://script.new" target="_blank" class="text-blue-600 font-semibold underline hover:text-blue-800">script.new ↗</a> (Google Apps Script).</li>
+                                    <li>Hapus isi default yang ada di editor, lalu paste kode berikut:</li>
+                                </ol>
+
+                                <div class="relative bg-neutral-900 text-neutral-100 rounded-xl p-3 font-mono text-[10px] overflow-x-auto">
+                                    <button type="button"
+                                            @click="navigator.clipboard.writeText(document.getElementById('apps-script-code').innerText); copied = true; setTimeout(() => copied = false, 2000)"
+                                            class="absolute top-2.5 right-2.5 px-2 py-1 rounded bg-white/20 hover:bg-white/30 text-white text-[10px] font-sans font-semibold transition-colors">
+                                        <span x-text="copied ? '✓ Tersalin!' : 'Salin Kode'"></span>
+                                    </button>
+                                    <pre id="apps-script-code">function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var folder = DriveApp.getFolderById(data.folderId);
+    var decoded = Utilities.base64Decode(data.base64);
+    var blob = Utilities.newBlob(decoded, data.mimeType || 'image/jpeg', data.filename);
+    var file = folder.createFile(blob);
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'success',
+      id: file.getId(),
+      name: file.getName()
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}</pre>
+                                </div>
+
+                                <ol start="3" class="list-decimal list-inside space-y-2 pl-1">
+                                    <li>Klik tombol <strong>Deploy</strong> (biru di kanan atas) &gt; pilih <strong>New deployment</strong>.</li>
+                                    <li>Klik ikon gerigi ⚙️ di samping <em>Select type</em> &gt; pilih <strong>Web app</strong>.</li>
+                                    <li>Atur pengaturan berikut:
+                                        <ul class="list-disc list-inside pl-4 mt-1 space-y-0.5 text-wedding-dark">
+                                            <li><strong>Execute as:</strong> <code>Me (email Anda)</code></li>
+                                            <li><strong>Who has access:</strong> <code>Anyone</code> (Siapa saja)</li>
+                                        </ul>
+                                    </li>
+                                    <li>Klik <strong>Deploy</strong> &gt; izinkan akses (Authorize Access) akun Google Anda.</li>
+                                    <li>Salin <strong>Web app URL</strong> yang berakhiran <code>/exec</code>.</li>
+                                    <li>Buka file <code>.env</code> di server Anda dan tambahkan baris:
+                                        <div class="mt-1 bg-black/5 p-2 rounded-lg font-mono text-wedding-dark text-[10px]">
+                                            GOOGLE_DRIVE_WEBHOOK_URL="https://script.google.com/macros/s/XXXXX.../exec"
+                                        </div>
+                                    </li>
+                                </ol>
+                                <p class="text-emerald-700 font-medium">
+                                    ✓ Setelah baris di atas disimpan di <code>.env</code>, klik tombol <strong>"Salin / Sinkronkan Ulang Semua Foto ke Drive"</strong> dan semua foto akan langsung tersalin ke folder Google Drive Anda!
                                 </p>
-                            @endif
-                            <p>
-                                2. Alternatif instan tanpa kredensial GCP: Gunakan tombol <strong>"Unduh Semua Foto (ZIP)"</strong> di atas untuk mengunduh seluruh foto event dalam satu klik, lalu tarik langsung ke folder Google Drive Anda.
-                            </p>
-                            <p>
-                                3. Setelah link didaftarkan, tamu acara juga dapat melihat tombol pintasan langsung menuju folder Google Drive di halaman Galeri Tamu.
-                            </p>
+                            </div>
+
+                            <!-- Opsi 2: GCP Service Account -->
+                            <div x-show="guideTab === 'gcp'" class="space-y-3 text-[11px] leading-relaxed text-wedding-subtle">
+                                <p class="text-wedding-dark font-medium">
+                                    Gunakan Google Cloud IAM Service Account untuk sinkronisasi resmi skala korporat melalui Google Drive v3 API.
+                                </p>
+                                @if(!empty($serviceAccountEmail))
+                                    <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+                                        <strong>Google Service Account Aktif Terdeteksi:</strong><br>
+                                        Bagikan (Share) folder Google Drive Anda ke email berikut dengan akses <strong>Editor</strong>:<br>
+                                        <code class="font-mono font-bold select-all bg-white px-2 py-0.5 rounded text-emerald-950 mt-1.5 inline-block">{{ $serviceAccountEmail }}</code>
+                                    </div>
+                                @else
+                                    <ol class="list-decimal list-inside space-y-2 pl-1">
+                                        <li>Buka <a href="https://console.cloud.google.com" target="_blank" class="text-blue-600 underline">Google Cloud Console ↗</a> dan aktifkan <strong>Google Drive API</strong>.</li>
+                                        <li>Buat <strong>Service Account</strong> di menu IAM &amp; Admin &gt; Service Accounts.</li>
+                                        <li>Buka tab <strong>Keys</strong> &gt; <strong>Add Key</strong> &gt; <strong>Create new key</strong> (JSON) lalu unduh filenya.</li>
+                                        <li>Letakkan file JSON tersebut di server pada path:<br>
+                                            <code class="bg-black/5 px-1.5 py-0.5 rounded font-mono text-[10px]">storage/app/google-service-account.json</code>
+                                        </li>
+                                        <li>Bagikan folder Google Drive Anda ke email Service Account tersebut sebagai <strong>Editor</strong>.</li>
+                                    </ol>
+                                @endif
+                            </div>
+
+                            <div class="p-3 rounded-xl bg-wedding-linen border border-wedding-gold/20 flex items-center justify-between">
+                                <span>Butuh backup instan tanpa setup API sekarang?</span>
+                                @if($photos->total() > 0)
+                                    <a href="{{ route('admin.events.download-zip', $event) }}" class="px-3 py-1.5 rounded-lg bg-wedding-gold text-white font-semibold text-[10px] hover:bg-wedding-goldHover transition-colors">
+                                        Unduh File ZIP Sekarang
+                                    </a>
+                                @endif
+                            </div>
                         </div>
                     </details>
                 </div>

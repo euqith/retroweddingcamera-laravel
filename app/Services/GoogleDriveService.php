@@ -72,13 +72,21 @@ class GoogleDriveService
             }
         }
 
-        // 2. Check JSON credentials file path in storage
-        $filePath = config('services.google.service_account_file');
-        if (!empty($filePath) && file_exists($filePath)) {
-            $fileContent = file_get_contents($filePath);
-            $data = json_decode($fileContent, true);
-            if (is_array($data) && !empty($data['client_email']) && !empty($data['private_key'])) {
-                return $data;
+        // 2. Check JSON credentials file path candidates
+        $candidates = array_filter([
+            config('services.google.service_account_file'),
+            storage_path('app/google-service-account.json'),
+            storage_path('app/google/service-account.json'),
+            base_path('google-service-account.json'),
+        ]);
+
+        foreach ($candidates as $filePath) {
+            if (file_exists($filePath) && is_readable($filePath)) {
+                $fileContent = file_get_contents($filePath);
+                $data = json_decode($fileContent, true);
+                if (is_array($data) && !empty($data['client_email']) && !empty($data['private_key'])) {
+                    return $data;
+                }
             }
         }
 
@@ -270,14 +278,25 @@ class GoogleDriveService
      */
     protected function uploadViaWebhook(string $webhookUrl, string $folderId, string $filename, string $binaryContent): bool
     {
-        $response = Http::timeout(35)->post($webhookUrl, [
+        $response = Http::timeout(45)->post($webhookUrl, [
             'folderId' => $folderId,
             'filename' => $filename,
             'mimeType' => 'image/jpeg',
             'base64' => base64_encode($binaryContent),
         ]);
 
-        return $response->successful();
+        if (!$response->successful()) {
+            Log::error("Google Apps Script Webhook HTTP {$response->status()}: " . $response->body());
+            return false;
+        }
+
+        $json = $response->json();
+        if (is_array($json) && isset($json['status']) && $json['status'] === 'error') {
+            Log::error('Google Apps Script Webhook Error: ' . ($json['message'] ?? 'Unknown error'));
+            return false;
+        }
+
+        return true;
     }
 
     /**
