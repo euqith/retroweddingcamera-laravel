@@ -53,6 +53,29 @@ class Event extends Model
     {
         parent::boot();
 
+        static::saving(function ($event) {
+            // Ensure empty strings on date/datetime columns are normalized to null for strict MySQL
+            if (empty($event->event_date)) {
+                $event->event_date = null;
+            }
+            if (empty($event->starts_at)) {
+                $event->starts_at = null;
+            }
+            if (empty($event->ends_at)) {
+                $event->ends_at = null;
+            }
+            if (empty($event->google_drive_url)) {
+                $event->google_drive_url = null;
+                $event->google_drive_folder_id = null;
+            }
+            if ($event->location === '') {
+                $event->location = null;
+            }
+            if ($event->description === '') {
+                $event->description = null;
+            }
+        });
+
         static::creating(function ($event) {
             if (empty($event->slug)) {
                 $baseSlug = Str::slug($event->title);

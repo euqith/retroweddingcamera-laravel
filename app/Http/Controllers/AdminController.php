@@ -63,9 +63,13 @@ class AdminController extends Controller
             $validated['slug'] = Str::slug($validated['title']);
         }
 
+        $validated['user_id'] = auth()->id() ?? null;
         $validated['show_date_stamp'] = $request->has('show_date_stamp');
         $validated['is_active'] = $request->has('is_active');
         $validated['is_gallery_public'] = $request->has('is_gallery_public');
+        $validated['event_date'] = !empty($validated['event_date']) ? $validated['event_date'] : null;
+        $validated['location'] = !empty($validated['location']) ? trim($validated['location']) : null;
+        $validated['description'] = !empty($validated['description']) ? trim($validated['description']) : null;
 
         if (!empty($validated['google_drive_url'])) {
             $validated['google_drive_url'] = trim($validated['google_drive_url']);
@@ -78,9 +82,14 @@ class AdminController extends Controller
         // Explicitly parse in Asia/Jakarta timezone (WIB)
         if (!empty($validated['starts_at'])) {
             $validated['starts_at'] = \Illuminate\Support\Carbon::parse($validated['starts_at'], 'Asia/Jakarta');
+        } else {
+            $validated['starts_at'] = null;
         }
+
         if (!empty($validated['ends_at'])) {
             $validated['ends_at'] = \Illuminate\Support\Carbon::parse($validated['ends_at'], 'Asia/Jakarta');
+        } else {
+            $validated['ends_at'] = null;
         }
 
         $event = Event::create($validated);
@@ -121,6 +130,9 @@ class AdminController extends Controller
         $validated['show_date_stamp'] = $request->has('show_date_stamp');
         $validated['is_active'] = $request->has('is_active');
         $validated['is_gallery_public'] = $request->has('is_gallery_public');
+        $validated['event_date'] = !empty($validated['event_date']) ? $validated['event_date'] : null;
+        $validated['location'] = !empty($validated['location']) ? trim($validated['location']) : null;
+        $validated['description'] = !empty($validated['description']) ? trim($validated['description']) : null;
 
         if (!empty($validated['google_drive_url'])) {
             $validated['google_drive_url'] = trim($validated['google_drive_url']);

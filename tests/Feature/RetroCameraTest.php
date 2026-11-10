@@ -695,5 +695,59 @@ class RetroCameraTest extends TestCase
         $response->assertSee('Buka Folder Google Drive Acara', false);
         $response->assertSee('https://drive.google.com/drive/folders/1aBcDeFgHiJkLmNoPqRsTuVwXyZ123456');
     }
+
+    public function test_admin_can_save_and_update_event_with_empty_dates_and_optional_fields(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        // Store with empty date strings
+        $response = $this->post('/admin/events', [
+            'title' => 'Event Without Dates',
+            'slug' => 'event-without-dates',
+            'event_type' => 'general',
+            'event_date' => '',
+            'starts_at' => '',
+            'ends_at' => '',
+            'location' => '',
+            'description' => '',
+            'theme_preset' => 'classic_film',
+            'filter_preset' => 'fuji_quicksnap',
+            'max_shots_per_device' => 36,
+            'is_active' => '1',
+            'google_drive_url' => '',
+        ]);
+
+        $response->assertRedirect();
+        $event = Event::where('slug', 'event-without-dates')->first();
+        $this->assertNotNull($event);
+        $this->assertNull($event->event_date);
+        $this->assertNull($event->starts_at);
+        $this->assertNull($event->ends_at);
+        $this->assertNull($event->location);
+        $this->assertNull($event->description);
+
+        // Update with empty dates
+        $updateResponse = $this->put("/admin/events/{$event->id}", [
+            'title' => 'Event Without Dates Renamed',
+            'slug' => 'event-without-dates',
+            'event_type' => 'wedding',
+            'event_date' => '',
+            'starts_at' => '',
+            'ends_at' => '',
+            'location' => '',
+            'description' => '',
+            'theme_preset' => 'ivory_gold',
+            'filter_preset' => 'lomography_color',
+            'max_shots_per_device' => 20,
+            'google_drive_url' => '',
+        ]);
+
+        $updateResponse->assertRedirect();
+        $event->refresh();
+        $this->assertEquals('Event Without Dates Renamed', $event->title);
+        $this->assertNull($event->event_date);
+        $this->assertNull($event->starts_at);
+        $this->assertNull($event->ends_at);
+    }
 }
 
