@@ -57,6 +57,7 @@ class AdminController extends Controller
             'is_active' => 'nullable|boolean',
             'is_gallery_public' => 'nullable|boolean',
             'google_drive_url' => 'nullable|string|max:500',
+            'google_drive_sync_frequency' => 'nullable|string|in:hourly,every_6_hours,twice_daily,daily,every_2_days,every_3_days,every_7_days,manual',
         ]);
 
         if (empty($validated['slug'])) {
@@ -70,6 +71,7 @@ class AdminController extends Controller
         $validated['event_date'] = !empty($validated['event_date']) ? $validated['event_date'] : null;
         $validated['location'] = !empty($validated['location']) ? trim($validated['location']) : null;
         $validated['description'] = !empty($validated['description']) ? trim($validated['description']) : null;
+        $validated['google_drive_sync_frequency'] = $validated['google_drive_sync_frequency'] ?? 'daily';
 
         if (!empty($validated['google_drive_url'])) {
             $validated['google_drive_url'] = trim($validated['google_drive_url']);
@@ -125,6 +127,7 @@ class AdminController extends Controller
             'show_date_stamp' => 'nullable|boolean',
             'max_shots_per_device' => 'required|integer|min:1|max:100',
             'google_drive_url' => 'nullable|string|max:500',
+            'google_drive_sync_frequency' => 'nullable|string|in:hourly,every_6_hours,twice_daily,daily,every_2_days,every_3_days,every_7_days,manual',
         ]);
 
         $validated['show_date_stamp'] = $request->has('show_date_stamp');
@@ -133,6 +136,7 @@ class AdminController extends Controller
         $validated['event_date'] = !empty($validated['event_date']) ? $validated['event_date'] : null;
         $validated['location'] = !empty($validated['location']) ? trim($validated['location']) : null;
         $validated['description'] = !empty($validated['description']) ? trim($validated['description']) : null;
+        $validated['google_drive_sync_frequency'] = $validated['google_drive_sync_frequency'] ?? 'daily';
 
         if (!empty($validated['google_drive_url'])) {
             $validated['google_drive_url'] = trim($validated['google_drive_url']);
@@ -212,6 +216,7 @@ class AdminController extends Controller
     {
         $validated = $request->validate([
             'google_drive_url' => 'required|string|max:500',
+            'google_drive_sync_frequency' => 'nullable|string|in:hourly,every_6_hours,twice_daily,daily,every_2_days,every_3_days,every_7_days,manual',
         ]);
 
         $url = trim($validated['google_drive_url']);
@@ -232,6 +237,7 @@ class AdminController extends Controller
         $event->update([
             'google_drive_url' => $url,
             'google_drive_folder_id' => $folderId,
+            'google_drive_sync_frequency' => $validated['google_drive_sync_frequency'] ?? ($event->google_drive_sync_frequency ?: 'daily'),
             'google_drive_sync_status' => 'idle',
         ]);
 

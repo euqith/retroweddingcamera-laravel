@@ -158,7 +158,7 @@
                           class="w-full px-4 py-3 rounded-xl border border-wedding-gold/30 text-sm bg-wedding-ivory/30">{{ old('description', $event->description) }}</textarea>
             </div>
 
-            <!-- Google Drive Folder Link -->
+            <!-- Google Drive Folder Link & Sync Schedule -->
             <div class="p-4 rounded-2xl bg-wedding-linen/40 border border-wedding-gold/30">
                 <div class="flex items-center space-x-2 mb-1.5">
                     <span class="text-base">📁</span>
@@ -172,6 +172,25 @@
                 <p class="text-[11px] text-wedding-subtle mt-1.5">
                     Folder Google Drive publik untuk mencadangkan seluruh foto acara. Anda juga dapat mengelola sinkronisasi langsung di Galeri Event.
                 </p>
+
+                <div class="mt-3 pt-3 border-t border-wedding-gold/20">
+                    <label class="block text-xs font-semibold text-wedding-dark mb-1">
+                        Jadwal Otomatis Sinkronisasi (Scheduler)
+                    </label>
+                    <select name="google_drive_sync_frequency" class="w-full px-3.5 py-2.5 rounded-xl border border-wedding-gold/30 text-xs sm:text-sm bg-white text-wedding-dark">
+                        <option value="daily" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency ?? 'daily') === 'daily' ? 'selected' : '' }}>1 Hari Sekali (Setiap Hari - Rekomendasi)</option>
+                        <option value="twice_daily" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'twice_daily' ? 'selected' : '' }}>2 Kali Sehari (Setiap 12 Jam)</option>
+                        <option value="every_6_hours" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'every_6_hours' ? 'selected' : '' }}>4 Kali Sehari (Setiap 6 Jam)</option>
+                        <option value="hourly" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'hourly' ? 'selected' : '' }}>Setiap Jam (1 Jam Sekali)</option>
+                        <option value="every_2_days" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'every_2_days' ? 'selected' : '' }}>2 Hari Sekali</option>
+                        <option value="every_3_days" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'every_3_days' ? 'selected' : '' }}>3 Hari Sekali</option>
+                        <option value="every_7_days" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'every_7_days' ? 'selected' : '' }}>1 Minggu Sekali</option>
+                        <option value="manual" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'manual' ? 'selected' : '' }}>Nonaktif (Hanya Sinkronisasi Manual)</option>
+                    </select>
+                    <span class="text-[10px] text-wedding-subtle block mt-1">
+                        Server otomatis memeriksa dan menyalin foto baru serta memulihkan foto terhapus sesuai interval ini.
+                    </span>
+                </div>
             </div>
 
             <!-- Options -->

@@ -914,5 +914,100 @@ class RetroCameraTest extends TestCase
         $this->assertEquals('existing_drive_id_2', $photo2->google_drive_file_id);
         $this->assertEquals(2, $this->event->fresh()->google_drive_synced_count);
     }
+
+    public function test_event_google_drive_frequency_helpers(): void
+    {
+        $this->event->update([
+            'google_drive_url' => 'https://drive.google.com/drive/folders/test-folder-123',
+            'google_drive_folder_id' => 'test-folder-123',
+            'google_drive_sync_frequency' => 'daily',
+            'google_drive_last_scheduled_sync_at' => now()->subHours(25),
+        ]);
+
+        $this->assertTrue($this->event->isGoogleDriveSyncDue());
+        $this->assertEquals(24, $this->event->googleDriveSyncFrequencyHours());
+        $this->assertEquals('1 Hari Sekali (Setiap Hari)', $this->event->googleDriveSyncFrequencyLabel());
+
+        // When recently synced (e.g. 2 hours ago)
+        $this->event->update([
+            'google_drive_last_scheduled_sync_at' => now()->subHours(2),
+        ]);
+        $this->assertFalse($this->event->isGoogleDriveSyncDue());
+
+        // When manual
+        $this->event->update([
+            'google_drive_sync_frequency' => 'manual',
+            'google_drive_last_scheduled_sync_at' => now()->subDays(5),
+        ]);
+        $this->assertFalse($this->event->isGoogleDriveSyncDue());
+        $this->assertNull($this->event->nextGoogleDriveSyncDueAt());
+    }
+
+    public function test_scheduled_sync_command_syncs_due_events(): void
+    {
+        config(['services.google.drive_webhook_url' => 'https://script.google.com/macros/s/test/exec']);
+
+        $this->event->update([
+            'google_drive_url' => 'https://drive.google.com/drive/folders/1DueFolder',
+            'google_drive_folder_id' => '1DueFolder',
+            'google_drive_sync_frequency' => 'daily',
+            'google_drive_last_scheduled_sync_at' => now()->subHours(30),
+        ]);
+
+        $session = CameraSession::create([
+            'event_id' => $this->event->id,
+            'device_token' => 'DEVICE-CRON-TEST',
+            'shots_taken' => 1,
+            'max_shots' => 36,
+        ]);
+
+        Storage::disk('public')->put("photos/{$this->event->slug}/cron1.jpg", 'cron-photo-content');
+
+        $photo = Photo::create([
+            'event_id' => $this->event->id,
+            'camera_session_id' => $session->id,
+            'shot_number' => 1,
+            'file_path' => "photos/{$this->event->slug}/cron1.jpg",
+            'thumbnail_path' => "photos/{$this->event->slug}/cron1.jpg",
+            'taken_at' => now(),
+        ]);
+
+        \Illuminate\Support\Facades\Http::fake([
+            '*' => \Illuminate\Support\Facades\Http::response([
+                'status' => 'success',
+                'id' => 'cron_drive_file_id',
+                'already_exists' => false,
+            ], 200),
+        ]);
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('gdrive:sync-scheduled');
+        $this->assertEquals(0, $exitCode);
+
+        $this->event->refresh();
+        $photo->refresh();
+
+        $this->assertNotNull($this->event->google_drive_last_scheduled_sync_at);
+        $this->assertTrue($this->event->google_drive_last_scheduled_sync_at->isToday());
+        $this->assertEquals('cron_drive_file_id', $photo->google_drive_file_id);
+    }
+
+    public function test_scheduled_sync_command_skips_events_not_due(): void
+    {
+        config(['services.google.drive_webhook_url' => 'https://script.google.com/macros/s/test/exec']);
+
+        $this->event->update([
+            'google_drive_url' => 'https://drive.google.com/drive/folders/1NotDueFolder',
+            'google_drive_folder_id' => '1NotDueFolder',
+            'google_drive_sync_frequency' => 'daily',
+            'google_drive_last_scheduled_sync_at' => now()->subHours(2),
+        ]);
+
+        \Illuminate\Support\Facades\Http::fake();
+
+        $exitCode = \Illuminate\Support\Facades\Artisan::call('gdrive:sync-scheduled');
+        $this->assertEquals(0, $exitCode);
+
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
 }
 

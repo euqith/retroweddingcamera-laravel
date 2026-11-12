@@ -174,6 +174,13 @@
                                             <span class="text-amber-700 font-bold">({{ $pendingPhotosCount }} foto baru belum disalin)</span>
                                         @endif
                                     </span>
+                                    <span>•</span>
+                                    <span>Jadwal Otomatis: <strong class="text-wedding-dark">{{ $event->googleDriveSyncFrequencyLabel() }}</strong></span>
+                                    @if($nextDue = $event->nextGoogleDriveSyncDueAt())
+                                        <span class="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-mono">
+                                            Berikutnya: {{ $nextDue->timezone('Asia/Jakarta')->format('d M, H:i') }} WIB
+                                        </span>
+                                    @endif
                                     @if($event->google_drive_synced_at)
                                         <span>• Terakhir disinkron: {{ $event->google_drive_synced_at->timezone('Asia/Jakarta')->format('d M Y, H:i') }} WIB</span>
                                     @endif
@@ -243,37 +250,58 @@
                 @endif
 
                 <!-- Registration / Edit Form -->
-                <div x-show="editing" class="space-y-3">
-                    <form action="{{ route('admin.events.google-drive.update', $event) }}" method="POST" class="space-y-3">
+                <div x-show="editing" class="space-y-4">
+                    <form action="{{ route('admin.events.google-drive.update', $event) }}" method="POST" class="space-y-4">
                         @csrf
                         <div>
                             <label class="block text-xs font-bold uppercase tracking-wider text-wedding-dark mb-1.5">
                                 Link Folder Google Drive (Public / Shared) *
                             </label>
-                            <div class="flex flex-col sm:flex-row gap-2">
-                                <input type="url" name="google_drive_url" required
-                                       value="{{ old('google_drive_url', $event->google_drive_url) }}"
-                                       placeholder="https://drive.google.com/drive/folders/1abcXYZ..."
-                                       class="flex-1 px-4 py-2.5 rounded-xl border border-wedding-gold/30 focus:border-wedding-gold text-xs sm:text-sm bg-wedding-ivory/30">
-                                <div class="flex items-center space-x-2">
-                                    <button type="submit"
-                                            class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-wedding-dark hover:bg-black text-white text-xs font-semibold shadow-xs transition-colors flex items-center justify-center space-x-1.5">
-                                        <svg class="w-4 h-4 text-wedding-gold" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"/>
-                                        </svg>
-                                        <span>Daftarkan & Salin Semua Foto</span>
-                                    </button>
-                                    @if(!empty($event->google_drive_folder_id))
-                                        <button type="button" @click="editing = false"
-                                                class="px-3.5 py-2.5 rounded-xl bg-white border border-wedding-gold/20 hover:bg-wedding-linen text-wedding-dark text-xs font-semibold">
-                                            Batal
-                                        </button>
-                                    @endif
-                                </div>
-                            </div>
+                            <input type="url" name="google_drive_url" required
+                                   value="{{ old('google_drive_url', $event->google_drive_url) }}"
+                                   placeholder="https://drive.google.com/drive/folders/1abcXYZ..."
+                                   class="w-full px-4 py-2.5 rounded-xl border border-wedding-gold/30 focus:border-wedding-gold text-xs sm:text-sm bg-wedding-ivory/30">
                             <span class="text-[11px] text-wedding-subtle mt-1.5 block">
                                 Contoh format: <code class="bg-black/5 px-1.5 py-0.5 rounded font-mono text-[10px]">https://drive.google.com/drive/folders/1AbC2dEf...</code>
                             </span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-wedding-dark mb-1.5">
+                                    Jadwal Otomatis Sinkronisasi (Scheduler)
+                                </label>
+                                <select name="google_drive_sync_frequency"
+                                        class="w-full px-3.5 py-2.5 rounded-xl border border-wedding-gold/30 text-xs sm:text-sm bg-wedding-ivory/30 text-wedding-dark">
+                                    <option value="daily" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency ?? 'daily') === 'daily' ? 'selected' : '' }}>1 Hari Sekali (Setiap Hari - Rekomendasi)</option>
+                                    <option value="twice_daily" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'twice_daily' ? 'selected' : '' }}>2 Kali Sehari (Setiap 12 Jam)</option>
+                                    <option value="every_6_hours" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'every_6_hours' ? 'selected' : '' }}>4 Kali Sehari (Setiap 6 Jam)</option>
+                                    <option value="hourly" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'hourly' ? 'selected' : '' }}>Setiap Jam (1 Jam Sekali)</option>
+                                    <option value="every_2_days" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'every_2_days' ? 'selected' : '' }}>2 Hari Sekali</option>
+                                    <option value="every_3_days" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'every_3_days' ? 'selected' : '' }}>3 Hari Sekali</option>
+                                    <option value="every_7_days" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'every_7_days' ? 'selected' : '' }}>1 Minggu Sekali</option>
+                                    <option value="manual" {{ old('google_drive_sync_frequency', $event->google_drive_sync_frequency) === 'manual' ? 'selected' : '' }}>Nonaktif (Hanya Sinkronisasi Manual)</option>
+                                </select>
+                                <span class="text-[11px] text-wedding-subtle mt-1 block">
+                                    Sistem akan otomatis memeriksa foto baru & memulihkan foto terhapus.
+                                </span>
+                            </div>
+
+                            <div class="flex items-end space-x-2">
+                                <button type="submit"
+                                        class="flex-1 px-5 py-2.5 rounded-xl bg-wedding-dark hover:bg-black text-white text-xs font-semibold shadow-xs transition-colors flex items-center justify-center space-x-1.5">
+                                    <svg class="w-4 h-4 text-wedding-gold" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"/>
+                                    </svg>
+                                    <span>Simpan & Sinkronkan</span>
+                                </button>
+                                @if(!empty($event->google_drive_folder_id))
+                                    <button type="button" @click="editing = false"
+                                            class="px-4 py-2.5 rounded-xl bg-white border border-wedding-gold/20 hover:bg-wedding-linen text-wedding-dark text-xs font-semibold">
+                                        Batal
+                                    </button>
+                                @endif
+                            </div>
                         </div>
                     </form>
                 </div>

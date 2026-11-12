@@ -32,7 +32,9 @@ class Event extends Model
         'google_drive_url',
         'google_drive_folder_id',
         'google_drive_sync_status',
+        'google_drive_sync_frequency',
         'google_drive_synced_at',
+        'google_drive_last_scheduled_sync_at',
         'google_drive_synced_count',
         'google_drive_last_error',
     ];
@@ -46,6 +48,7 @@ class Event extends Model
         'is_active' => 'boolean',
         'is_gallery_public' => 'boolean',
         'google_drive_synced_at' => 'datetime',
+        'google_drive_last_scheduled_sync_at' => 'datetime',
         'google_drive_synced_count' => 'integer',
     ];
 
@@ -188,6 +191,77 @@ class Event extends Model
         }
 
         return 'open';
+    }
+
+    /**
+     * Check if scheduled Google Drive sync is due for this event.
+     */
+    public function isGoogleDriveSyncDue(): bool
+    {
+        if (empty($this->google_drive_folder_id) || $this->google_drive_sync_frequency === 'manual') {
+            return false;
+        }
+
+        $lastSync = $this->google_drive_last_scheduled_sync_at ?? $this->google_drive_synced_at;
+        if (!$lastSync) {
+            return true; // Never synced before
+        }
+
+        $hours = $this->googleDriveSyncFrequencyHours();
+
+        return $lastSync->copy()->addHours($hours)->isPast();
+    }
+
+    /**
+     * Get the next scheduled sync time.
+     */
+    public function nextGoogleDriveSyncDueAt(): ?\Illuminate\Support\Carbon
+    {
+        if (empty($this->google_drive_folder_id) || $this->google_drive_sync_frequency === 'manual') {
+            return null;
+        }
+
+        $lastSync = $this->google_drive_last_scheduled_sync_at ?? $this->google_drive_synced_at;
+        if (!$lastSync) {
+            return now();
+        }
+
+        return $lastSync->copy()->addHours($this->googleDriveSyncFrequencyHours());
+    }
+
+    /**
+     * Get sync interval in hours based on frequency setting.
+     */
+    public function googleDriveSyncFrequencyHours(): int
+    {
+        return match ($this->google_drive_sync_frequency) {
+            'hourly' => 1,
+            'every_6_hours' => 6,
+            'twice_daily' => 12,
+            'every_2_days' => 48,
+            'every_3_days' => 72,
+            'every_7_days' => 168,
+            'daily' => 24,
+            default => 24,
+        };
+    }
+
+    /**
+     * Human-readable frequency label.
+     */
+    public function googleDriveSyncFrequencyLabel(): string
+    {
+        return match ($this->google_drive_sync_frequency) {
+            'hourly' => 'Setiap Jam (1 Jam Sekali)',
+            'every_6_hours' => '4 Kali Sehari (Setiap 6 Jam)',
+            'twice_daily' => '2 Kali Sehari (Setiap 12 Jam)',
+            'daily' => '1 Hari Sekali (Setiap Hari)',
+            'every_2_days' => '2 Hari Sekali',
+            'every_3_days' => '3 Hari Sekali',
+            'every_7_days' => '1 Minggu Sekali',
+            'manual' => 'Nonaktif (Manual Saja)',
+            default => '1 Hari Sekali',
+        };
     }
 
     /**
