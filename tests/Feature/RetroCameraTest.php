@@ -749,5 +749,93 @@ class RetroCameraTest extends TestCase
         $this->assertNull($event->starts_at);
         $this->assertNull($event->ends_at);
     }
+
+    public function test_google_drive_sync_does_not_duplicate_already_synced_photos(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        config(['services.google.drive_webhook_url' => 'https://script.google.com/macros/s/test/exec']);
+
+        $this->event->update([
+            'google_drive_url' => 'https://drive.google.com/drive/folders/1FakeFolderId',
+            'google_drive_folder_id' => '1FakeFolderId',
+        ]);
+
+        $session = CameraSession::create([
+            'event_id' => $this->event->id,
+            'device_token' => 'DEVICE-SYNC-DEDUP',
+            'shots_taken' => 2,
+            'max_shots' => 36,
+        ]);
+
+        Storage::disk('public')->put("photos/{$this->event->slug}/shot1.jpg", 'photo-1-content');
+        Storage::disk('public')->put("photos/{$this->event->slug}/shot2.jpg", 'photo-2-content');
+
+        $photo1 = Photo::create([
+            'event_id' => $this->event->id,
+            'camera_session_id' => $session->id,
+            'shot_number' => 1,
+            'file_path' => "photos/{$this->event->slug}/shot1.jpg",
+            'thumbnail_path' => "photos/{$this->event->slug}/shot1.jpg",
+            'taken_at' => now(),
+        ]);
+
+        $photo2 = Photo::create([
+            'event_id' => $this->event->id,
+            'camera_session_id' => $session->id,
+            'shot_number' => 2,
+            'file_path' => "photos/{$this->event->slug}/shot2.jpg",
+            'thumbnail_path' => "photos/{$this->event->slug}/shot2.jpg",
+            'taken_at' => now(),
+        ]);
+
+        // First Sync: both photos are uploaded
+        \Illuminate\Support\Facades\Http::fake([
+            'https://script.google.com/macros/s/test/exec' => \Illuminate\Support\Facades\Http::response([
+                'status' => 'success',
+                'id' => 'gdrive_file_id_123',
+                'name' => 'shot_1.jpg',
+            ], 200),
+        ]);
+
+        $response1 = $this->post("/admin/events/{$this->event->id}/google-drive/sync");
+        $response1->assertRedirect();
+
+        $photo1->refresh();
+        $photo2->refresh();
+        $this->assertNotNull($photo1->google_drive_file_id);
+        $this->assertNotNull($photo2->google_drive_file_id);
+        $this->assertEquals(2, $this->event->fresh()->google_drive_synced_count);
+
+        // Add 3rd photo
+        Storage::disk('public')->put("photos/{$this->event->slug}/shot3.jpg", 'photo-3-content');
+        $photo3 = Photo::create([
+            'event_id' => $this->event->id,
+            'camera_session_id' => $session->id,
+            'shot_number' => 3,
+            'file_path' => "photos/{$this->event->slug}/shot3.jpg",
+            'thumbnail_path' => "photos/{$this->event->slug}/shot3.jpg",
+            'taken_at' => now(),
+        ]);
+
+        // Second Sync: only 1 request should be sent (for photo 3)
+        \Illuminate\Support\Facades\Http::fake([
+            'https://script.google.com/macros/s/test/exec' => \Illuminate\Support\Facades\Http::response([
+                'status' => 'success',
+                'id' => 'gdrive_file_id_456',
+                'name' => 'shot_3.jpg',
+            ], 200),
+        ]);
+
+        $response2 = $this->post("/admin/events/{$this->event->id}/google-drive/sync");
+        $response2->assertRedirect();
+
+        // Verify only 1 HTTP request was made during the second sync!
+        \Illuminate\Support\Facades\Http::assertSentCount(1);
+
+        $photo3->refresh();
+        $this->assertNotNull($photo3->google_drive_file_id);
+        $this->assertEquals(3, $this->event->fresh()->google_drive_synced_count);
+    }
 }
 

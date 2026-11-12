@@ -153,6 +153,10 @@
             <!-- Content Area -->
             <div class="pt-5" x-data="{ editing: {{ empty($event->google_drive_folder_id) ? 'true' : 'false' }} }">
                 @if(!empty($event->google_drive_folder_id))
+                    @php
+                        $syncedPhotosCount = $event->photos()->whereNotNull('google_drive_file_id')->count();
+                        $pendingPhotosCount = $event->photos()->whereNull('google_drive_file_id')->count();
+                    @endphp
                     <div x-show="!editing" class="space-y-4">
                         <div class="p-4 rounded-2xl bg-wedding-ivory/60 border border-wedding-gold/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div class="min-w-0">
@@ -160,8 +164,16 @@
                                 <a href="{{ $event->google_drive_url }}" target="_blank" class="text-xs font-mono font-medium text-wedding-dark hover:underline truncate block max-w-xl">
                                     {{ $event->google_drive_url }}
                                 </a>
-                                <div class="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-wedding-subtle">
+                                <div class="flex flex-wrap items-center gap-2 mt-1.5 text-[11px] text-wedding-subtle">
                                     <span>Folder ID: <strong class="font-mono text-wedding-dark">{{ $event->google_drive_folder_id }}</strong></span>
+                                    <span>•</span>
+                                    <span class="inline-flex items-center space-x-1 font-medium text-wedding-dark">
+                                        <span>Status:</span>
+                                        <strong class="text-emerald-700">{{ $syncedPhotosCount }} Foto Tersinkron</strong>
+                                        @if($pendingPhotosCount > 0)
+                                            <span class="text-amber-700 font-bold">({{ $pendingPhotosCount }} foto baru belum disalin)</span>
+                                        @endif
+                                    </span>
                                     @if($event->google_drive_synced_at)
                                         <span>• Terakhir disinkron: {{ $event->google_drive_synced_at->timezone('Asia/Jakarta')->format('d M Y, H:i') }} WIB</span>
                                     @endif
@@ -198,7 +210,11 @@
                                     <svg class="w-4 h-4 text-wedding-gold" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
                                     </svg>
-                                    <span>Salin / Sinkronkan Ulang Semua Foto ke Drive</span>
+                                    @if($pendingPhotosCount > 0)
+                                        <span>Salin {{ $pendingPhotosCount }} Foto Baru ke Google Drive</span>
+                                    @else
+                                        <span>Sinkronkan Foto ke Google Drive</span>
+                                    @endif
                                 </button>
                             </form>
 
@@ -296,6 +312,19 @@
   try {
     var data = JSON.parse(e.postData.contents);
     var folder = DriveApp.getFolderById(data.folderId);
+    
+    // Cegah duplikasi: jika file dengan nama sama sudah ada di folder, jangan buat ulang
+    var existingFiles = folder.getFilesByName(data.filename);
+    if (existingFiles.hasNext()) {
+      var existing = existingFiles.next();
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        id: existing.getId(),
+        name: existing.getName(),
+        already_exists: true
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     var decoded = Utilities.base64Decode(data.base64);
     var blob = Utilities.newBlob(decoded, data.mimeType || 'image/jpeg', data.filename);
     var file = folder.createFile(blob);

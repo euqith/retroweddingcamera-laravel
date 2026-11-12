@@ -19,6 +19,19 @@ function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var folder = DriveApp.getFolderById(data.folderId);
+    
+    // Cegah duplikasi: jika file dengan nama sama sudah ada di folder, jangan buat ulang
+    var existingFiles = folder.getFilesByName(data.filename);
+    if (existingFiles.hasNext()) {
+      var existing = existingFiles.next();
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        id: existing.getId(),
+        name: existing.getName(),
+        already_exists: true
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     var decoded = Utilities.base64Decode(data.base64);
     var blob = Utilities.newBlob(decoded, data.mimeType || 'image/jpeg', data.filename);
     var file = folder.createFile(blob);
@@ -84,3 +97,4 @@ Jika Anda belum sempat melakukan konfigurasi di atas, Anda tetap dapat mengunduh
 2. Klik tombol **"Unduh Semua Foto (ZIP)"** di toolbar atas.
 3. Seluruh foto beresolusi penuh akan terunduh dalam satu file `.zip`.
 4. Buka folder Google Drive Anda di browser dan drag-and-drop seluruh foto dari ZIP tersebut.
+

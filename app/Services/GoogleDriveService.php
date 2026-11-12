@@ -94,9 +94,9 @@ class GoogleDriveService
     }
 
     /**
-     * Synchronize all event photos to the registered Google Drive folder.
+     * Synchronize event photos to the registered Google Drive folder without duplicating.
      */
-    public function syncEventPhotos(Event $event): array
+    public function syncEventPhotos(Event $event, bool $force = false): array
     {
         $folderId = $event->google_drive_folder_id ?: $this->extractFolderId($event->google_drive_url);
 
@@ -136,8 +136,8 @@ class GoogleDriveService
             'google_drive_last_error' => null,
         ]);
 
-        $photos = $event->photos()->orderBy('shot_number')->get();
-        if ($photos->isEmpty()) {
+        $allPhotos = $event->photos()->orderBy('shot_number')->get();
+        if ($allPhotos->isEmpty()) {
             $event->update([
                 'google_drive_sync_status' => 'completed',
                 'google_drive_synced_at' => now(),
@@ -151,11 +151,32 @@ class GoogleDriveService
             ];
         }
 
-        $syncedCount = 0;
+        // Filter only unsynced photos unless $force is true
+        $alreadySyncedCount = $allPhotos->whereNotNull('google_drive_file_id')->count();
+        $photosToSync = $force
+            ? $allPhotos
+            : $allPhotos->whereNull('google_drive_file_id');
+
+        if ($photosToSync->isEmpty()) {
+            $event->update([
+                'google_drive_sync_status' => 'completed',
+                'google_drive_synced_at' => now(),
+                'google_drive_synced_count' => $alreadySyncedCount,
+            ]);
+
+            return [
+                'success' => true,
+                'count' => 0,
+                'already_synced' => $alreadySyncedCount,
+                'message' => "Semua {$alreadySyncedCount} foto sudah tersinkronkan di Google Drive. Tidak ada foto baru yang perlu disalin.",
+            ];
+        }
+
+        $newlySyncedCount = 0;
         $failedCount = 0;
         $lastError = null;
 
-        foreach ($photos as $photo) {
+        foreach ($photosToSync as $photo) {
             $binary = $this->getPhotoBinary($photo);
             if (!$binary) {
                 $failedCount++;
@@ -165,15 +186,19 @@ class GoogleDriveService
             $filename = "shot_{$photo->shot_number}_" . ($photo->taken_at ? $photo->taken_at->format('Ymd_His') : date('Ymd_His')) . ".jpg";
 
             try {
-                $uploaded = false;
+                $fileId = null;
                 if ($credentials) {
-                    $uploaded = $this->uploadViaServiceAccount($credentials, $folderId, $filename, $binary);
+                    $fileId = $this->uploadViaServiceAccount($credentials, $folderId, $filename, $binary);
                 } elseif (!empty($webhookUrl)) {
-                    $uploaded = $this->uploadViaWebhook($webhookUrl, $folderId, $filename, $binary);
+                    $fileId = $this->uploadViaWebhook($webhookUrl, $folderId, $filename, $binary);
                 }
 
-                if ($uploaded) {
-                    $syncedCount++;
+                if (!empty($fileId)) {
+                    $photo->update([
+                        'google_drive_file_id' => $fileId,
+                        'google_drive_synced_at' => now(),
+                    ]);
+                    $newlySyncedCount++;
                 } else {
                     $failedCount++;
                     $lastError = "Google API menolak pengunggahan file {$filename}. Pastikan folder dibagikan dengan hak akses Editor.";
@@ -185,27 +210,47 @@ class GoogleDriveService
             }
         }
 
-        $status = ($failedCount === 0 || $syncedCount > 0) ? 'completed' : 'failed';
+        $totalSynced = $event->photos()->whereNotNull('google_drive_file_id')->count();
+        $status = ($failedCount === 0 || $totalSynced > 0) ? 'completed' : 'failed';
+
         $event->update([
             'google_drive_sync_status' => $status,
             'google_drive_synced_at' => now(),
-            'google_drive_synced_count' => $syncedCount,
+            'google_drive_synced_count' => $totalSynced,
             'google_drive_last_error' => $lastError,
         ]);
 
-        if ($syncedCount > 0) {
+        if ($newlySyncedCount > 0) {
+            $message = "Berhasil menyalin {$newlySyncedCount} foto baru ke folder Google Drive!";
+            if ($alreadySyncedCount > 0) {
+                $message .= " ({$alreadySyncedCount} foto sebelumnya sudah ada, total {$totalSynced} foto di Drive).";
+            }
+            if ($failedCount > 0) {
+                $message .= " ({$failedCount} file gagal disalin).";
+            }
+
             return [
                 'success' => true,
-                'count' => $syncedCount,
+                'count' => $newlySyncedCount,
+                'total_synced' => $totalSynced,
                 'failed' => $failedCount,
-                'message' => "Berhasil menyalin {$syncedCount} foto ke folder Google Drive!" . ($failedCount > 0 ? " ({$failedCount} file gagal)" : ""),
+                'message' => $message,
+            ];
+        }
+
+        if ($alreadySyncedCount > 0 && $failedCount === 0) {
+            return [
+                'success' => true,
+                'count' => 0,
+                'total_synced' => $totalSynced,
+                'message' => "Seluruh {$totalSynced} foto sudah tersimpan di Google Drive.",
             ];
         }
 
         return [
             'success' => false,
             'requires_credentials' => false,
-            'message' => 'Gagal menyalin foto ke Google Drive: ' . ($lastError ?: 'Periksa hak akses folder.'),
+            'message' => 'Gagal menyalin foto baru ke Google Drive: ' . ($lastError ?: 'Periksa hak akses folder.'),
         ];
     }
 
@@ -241,11 +286,36 @@ class GoogleDriveService
 
     /**
      * Upload binary image to Google Drive folder using Service Account via Drive v3 API.
+     * Returns Google Drive file ID on success, or null on failure.
      */
-    protected function uploadViaServiceAccount(array $credentials, string $folderId, string $filename, string $binaryContent): bool
+    protected function uploadViaServiceAccount(array $credentials, string $folderId, string $filename, string $binaryContent): ?string
     {
         $token = $this->getAccessToken($credentials);
 
+        // 1. Check if a file with this name already exists in the target folder
+        try {
+            $escapedFilename = addcslashes($filename, "'\\");
+            $query = "name = '{$escapedFilename}' and '{$folderId}' in parents and trashed = false";
+            $search = Http::withHeaders(['Authorization' => 'Bearer ' . $token])
+                ->timeout(15)
+                ->get('https://www.googleapis.com/drive/v3/files', [
+                    'q' => $query,
+                    'fields' => 'files(id, name)',
+                    'pageSize' => 1,
+                ]);
+
+            if ($search->successful()) {
+                $files = $search->json('files');
+                if (!empty($files) && !empty($files[0]['id'])) {
+                    // File already exists in Google Drive, return its ID without uploading duplicate!
+                    return $files[0]['id'];
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Google Drive existence query error: ' . $e->getMessage());
+        }
+
+        // 2. Upload file
         $metadata = [
             'name' => $filename,
             'parents' => [$folderId],
@@ -270,13 +340,18 @@ class GoogleDriveService
         ])->timeout(35)->withBody($multipartBody, 'multipart/related; boundary=' . $boundary)
           ->post('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart');
 
-        return $response->successful();
+        if ($response->successful()) {
+            return $response->json('id') ?? 'synced';
+        }
+
+        return null;
     }
 
     /**
      * Upload via Google Apps Script Webhook.
+     * Returns Google Drive file ID on success, or null on failure.
      */
-    protected function uploadViaWebhook(string $webhookUrl, string $folderId, string $filename, string $binaryContent): bool
+    protected function uploadViaWebhook(string $webhookUrl, string $folderId, string $filename, string $binaryContent): ?string
     {
         $response = Http::timeout(45)->post($webhookUrl, [
             'folderId' => $folderId,
@@ -287,16 +362,16 @@ class GoogleDriveService
 
         if (!$response->successful()) {
             Log::error("Google Apps Script Webhook HTTP {$response->status()}: " . $response->body());
-            return false;
+            return null;
         }
 
         $json = $response->json();
         if (is_array($json) && isset($json['status']) && $json['status'] === 'error') {
             Log::error('Google Apps Script Webhook Error: ' . ($json['message'] ?? 'Unknown error'));
-            return false;
+            return null;
         }
 
-        return true;
+        return $json['id'] ?? 'synced';
     }
 
     /**

@@ -21,6 +21,8 @@ class Photo extends Model
         'camera_facing',
         'flash_enabled',
         'filter_applied',
+        'google_drive_file_id',
+        'google_drive_synced_at',
         'caption',
         'is_visible',
         'taken_at',
@@ -30,6 +32,7 @@ class Photo extends Model
         'shot_number' => 'integer',
         'flash_enabled' => 'boolean',
         'is_visible' => 'boolean',
+        'google_drive_synced_at' => 'datetime',
         'taken_at' => 'datetime',
     ];
 

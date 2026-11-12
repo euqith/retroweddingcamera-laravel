@@ -221,6 +221,14 @@ class AdminController extends Controller
             return back()->with('error', 'Format URL Google Drive tidak valid. Pastikan link berupa folder Google Drive yang valid.');
         }
 
+        // If folder changed, reset photo sync markers
+        if ($event->google_drive_folder_id !== $folderId) {
+            $event->photos()->update([
+                'google_drive_file_id' => null,
+                'google_drive_synced_at' => null,
+            ]);
+        }
+
         $event->update([
             'google_drive_url' => $url,
             'google_drive_folder_id' => $folderId,
@@ -242,13 +250,14 @@ class AdminController extends Controller
     /**
      * Manually re-sync/copy all event photos to Google Drive.
      */
-    public function syncGoogleDrive(Event $event, GoogleDriveService $driveService)
+    public function syncGoogleDrive(Request $request, Event $event, GoogleDriveService $driveService)
     {
         if (empty($event->google_drive_url) && empty($event->google_drive_folder_id)) {
             return back()->with('error', 'Belum ada link Google Drive yang terdaftar untuk event ini.');
         }
 
-        $syncResult = $driveService->syncEventPhotos($event);
+        $force = $request->boolean('force');
+        $syncResult = $driveService->syncEventPhotos($event, $force);
 
         if ($syncResult['success']) {
             return back()->with('success', $syncResult['message']);
@@ -264,6 +273,12 @@ class AdminController extends Controller
      */
     public function disconnectGoogleDrive(Event $event)
     {
+        // Reset photo sync markers for this event
+        $event->photos()->update([
+            'google_drive_file_id' => null,
+            'google_drive_synced_at' => null,
+        ]);
+
         $event->update([
             'google_drive_url' => null,
             'google_drive_folder_id' => null,
