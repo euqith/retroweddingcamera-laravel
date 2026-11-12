@@ -94,7 +94,8 @@ class GoogleDriveService
     }
 
     /**
-     * Synchronize event photos to the registered Google Drive folder without duplicating.
+     * Synchronize event photos to the registered Google Drive folder.
+     * Prevents duplicates, and re-inserts photos if they were accidentally deleted from Google Drive.
      */
     public function syncEventPhotos(Event $event, bool $force = false): array
     {
@@ -151,28 +152,17 @@ class GoogleDriveService
             ];
         }
 
-        // Filter only unsynced photos unless $force is true
-        $alreadySyncedCount = $allPhotos->whereNotNull('google_drive_file_id')->count();
-        $photosToSync = $force
+        // If force requested OR all photos already marked synced, verify against Drive to restore deleted photos
+        $hasPendingUnsynced = $allPhotos->whereNull('google_drive_file_id')->isNotEmpty();
+        $shouldCheckAll = $force || !$hasPendingUnsynced;
+
+        $photosToSync = $shouldCheckAll
             ? $allPhotos
             : $allPhotos->whereNull('google_drive_file_id');
 
-        if ($photosToSync->isEmpty()) {
-            $event->update([
-                'google_drive_sync_status' => 'completed',
-                'google_drive_synced_at' => now(),
-                'google_drive_synced_count' => $alreadySyncedCount,
-            ]);
-
-            return [
-                'success' => true,
-                'count' => 0,
-                'already_synced' => $alreadySyncedCount,
-                'message' => "Semua {$alreadySyncedCount} foto sudah tersinkronkan di Google Drive. Tidak ada foto baru yang perlu disalin.",
-            ];
-        }
-
         $newlySyncedCount = 0;
+        $restoredCount = 0;
+        $alreadyExistedCount = 0;
         $failedCount = 0;
         $lastError = null;
 
@@ -184,21 +174,32 @@ class GoogleDriveService
             }
 
             $filename = "shot_{$photo->shot_number}_" . ($photo->taken_at ? $photo->taken_at->format('Ymd_His') : date('Ymd_His')) . ".jpg";
+            $wasAlreadyMarkedInDb = !empty($photo->google_drive_file_id);
 
             try {
-                $fileId = null;
+                $result = null;
                 if ($credentials) {
-                    $fileId = $this->uploadViaServiceAccount($credentials, $folderId, $filename, $binary);
+                    $result = $this->uploadViaServiceAccount($credentials, $folderId, $filename, $binary);
                 } elseif (!empty($webhookUrl)) {
-                    $fileId = $this->uploadViaWebhook($webhookUrl, $folderId, $filename, $binary);
+                    $result = $this->uploadViaWebhook($webhookUrl, $folderId, $filename, $binary);
                 }
 
-                if (!empty($fileId)) {
+                if (!empty($result) && !empty($result['id'])) {
                     $photo->update([
-                        'google_drive_file_id' => $fileId,
+                        'google_drive_file_id' => $result['id'],
                         'google_drive_synced_at' => now(),
                     ]);
-                    $newlySyncedCount++;
+
+                    if (!empty($result['already_exists'])) {
+                        $alreadyExistedCount++;
+                    } else {
+                        // File was uploaded / restored to Drive!
+                        if ($wasAlreadyMarkedInDb) {
+                            $restoredCount++;
+                        } else {
+                            $newlySyncedCount++;
+                        }
+                    }
                 } else {
                     $failedCount++;
                     $lastError = "Google API menolak pengunggahan file {$filename}. Pastikan folder dibagikan dengan hak akses Editor.";
@@ -220,13 +221,41 @@ class GoogleDriveService
             'google_drive_last_error' => $lastError,
         ]);
 
+        if ($restoredCount > 0 && $newlySyncedCount > 0) {
+            $msg = "Berhasil menyalin {$newlySyncedCount} foto baru dan memulihkan {$restoredCount} foto yang terhapus di Google Drive!";
+            if ($failedCount > 0) {
+                $msg .= " ({$failedCount} file gagal).";
+            }
+            return [
+                'success' => true,
+                'count' => $newlySyncedCount + $restoredCount,
+                'restored' => $restoredCount,
+                'total_synced' => $totalSynced,
+                'message' => $msg,
+            ];
+        }
+
+        if ($restoredCount > 0) {
+            $msg = "Berhasil memulihkan {$restoredCount} foto yang sebelumnya terhapus dari Google Drive!";
+            if ($failedCount > 0) {
+                $msg .= " ({$failedCount} file gagal).";
+            }
+            return [
+                'success' => true,
+                'count' => $restoredCount,
+                'restored' => $restoredCount,
+                'total_synced' => $totalSynced,
+                'message' => $msg,
+            ];
+        }
+
         if ($newlySyncedCount > 0) {
-            $message = "Berhasil menyalin {$newlySyncedCount} foto baru ke folder Google Drive!";
-            if ($alreadySyncedCount > 0) {
-                $message .= " ({$alreadySyncedCount} foto sebelumnya sudah ada, total {$totalSynced} foto di Drive).";
+            $msg = "Berhasil menyalin {$newlySyncedCount} foto baru ke folder Google Drive!";
+            if ($alreadyExistedCount > 0) {
+                $msg .= " ({$alreadyExistedCount} foto sebelumnya sudah ada, total {$totalSynced} foto di Drive).";
             }
             if ($failedCount > 0) {
-                $message .= " ({$failedCount} file gagal disalin).";
+                $msg .= " ({$failedCount} file gagal).";
             }
 
             return [
@@ -234,23 +263,23 @@ class GoogleDriveService
                 'count' => $newlySyncedCount,
                 'total_synced' => $totalSynced,
                 'failed' => $failedCount,
-                'message' => $message,
+                'message' => $msg,
             ];
         }
 
-        if ($alreadySyncedCount > 0 && $failedCount === 0) {
+        if ($failedCount === 0) {
             return [
                 'success' => true,
                 'count' => 0,
                 'total_synced' => $totalSynced,
-                'message' => "Seluruh {$totalSynced} foto sudah tersimpan di Google Drive.",
+                'message' => "Semua {$totalSynced} foto lengkap dan terverifikasi ada di Google Drive (tidak ada foto yang hilang).",
             ];
         }
 
         return [
             'success' => false,
             'requires_credentials' => false,
-            'message' => 'Gagal menyalin foto baru ke Google Drive: ' . ($lastError ?: 'Periksa hak akses folder.'),
+            'message' => 'Gagal menyalin foto ke Google Drive: ' . ($lastError ?: 'Periksa hak akses folder.'),
         ];
     }
 
@@ -286,9 +315,9 @@ class GoogleDriveService
 
     /**
      * Upload binary image to Google Drive folder using Service Account via Drive v3 API.
-     * Returns Google Drive file ID on success, or null on failure.
+     * Returns array ['id' => '...', 'already_exists' => bool] on success, or null on failure.
      */
-    protected function uploadViaServiceAccount(array $credentials, string $folderId, string $filename, string $binaryContent): ?string
+    protected function uploadViaServiceAccount(array $credentials, string $folderId, string $filename, string $binaryContent): ?array
     {
         $token = $this->getAccessToken($credentials);
 
@@ -308,7 +337,10 @@ class GoogleDriveService
                 $files = $search->json('files');
                 if (!empty($files) && !empty($files[0]['id'])) {
                     // File already exists in Google Drive, return its ID without uploading duplicate!
-                    return $files[0]['id'];
+                    return [
+                        'id' => $files[0]['id'],
+                        'already_exists' => true,
+                    ];
                 }
             }
         } catch (\Throwable $e) {
@@ -341,7 +373,10 @@ class GoogleDriveService
           ->post('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart');
 
         if ($response->successful()) {
-            return $response->json('id') ?? 'synced';
+            return [
+                'id' => $response->json('id') ?? 'synced',
+                'already_exists' => false,
+            ];
         }
 
         return null;
@@ -349,9 +384,9 @@ class GoogleDriveService
 
     /**
      * Upload via Google Apps Script Webhook.
-     * Returns Google Drive file ID on success, or null on failure.
+     * Returns array ['id' => '...', 'already_exists' => bool] on success, or null on failure.
      */
-    protected function uploadViaWebhook(string $webhookUrl, string $folderId, string $filename, string $binaryContent): ?string
+    protected function uploadViaWebhook(string $webhookUrl, string $folderId, string $filename, string $binaryContent): ?array
     {
         $response = Http::timeout(45)->post($webhookUrl, [
             'folderId' => $folderId,
@@ -371,7 +406,10 @@ class GoogleDriveService
             return null;
         }
 
-        return $json['id'] ?? 'synced';
+        return [
+            'id' => $json['id'] ?? 'synced',
+            'already_exists' => !empty($json['already_exists']),
+        ];
     }
 
     /**

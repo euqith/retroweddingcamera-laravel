@@ -20,16 +20,18 @@ function doPost(e) {
     var data = JSON.parse(e.postData.contents);
     var folder = DriveApp.getFolderById(data.folderId);
     
-    // Cegah duplikasi: jika file dengan nama sama sudah ada di folder, jangan buat ulang
+    // Cegah duplikasi: jika file dengan nama sama sudah ada dan TIDAK di tempat sampah (trash), jangan buat ulang
     var existingFiles = folder.getFilesByName(data.filename);
-    if (existingFiles.hasNext()) {
+    while (existingFiles.hasNext()) {
       var existing = existingFiles.next();
-      return ContentService.createTextOutput(JSON.stringify({
-        status: 'success',
-        id: existing.getId(),
-        name: existing.getName(),
-        already_exists: true
-      })).setMimeType(ContentService.MimeType.JSON);
+      if (!existing.isTrashed()) {
+        return ContentService.createTextOutput(JSON.stringify({
+          status: 'success',
+          id: existing.getId(),
+          name: existing.getName(),
+          already_exists: true
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
     }
 
     var decoded = Utilities.base64Decode(data.base64);

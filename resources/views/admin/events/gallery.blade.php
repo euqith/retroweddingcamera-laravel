@@ -203,20 +203,34 @@
                         @endif
 
                         <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
-                            <form action="{{ route('admin.events.google-drive.sync', $event) }}" method="POST">
-                                @csrf
-                                <button type="submit"
-                                        class="px-4 py-2 bg-wedding-dark hover:bg-black text-white text-xs font-semibold rounded-xl shadow-xs flex items-center space-x-2 transition-colors">
-                                    <svg class="w-4 h-4 text-wedding-gold" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
-                                    </svg>
-                                    @if($pendingPhotosCount > 0)
-                                        <span>Salin {{ $pendingPhotosCount }} Foto Baru ke Google Drive</span>
-                                    @else
-                                        <span>Sinkronkan Foto ke Google Drive</span>
-                                    @endif
-                                </button>
-                            </form>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <form action="{{ route('admin.events.google-drive.sync', $event) }}" method="POST">
+                                    @csrf
+                                    <button type="submit"
+                                            class="px-4 py-2 bg-wedding-dark hover:bg-black text-white text-xs font-semibold rounded-xl shadow-xs flex items-center space-x-2 transition-colors">
+                                        <svg class="w-4 h-4 text-wedding-gold" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+                                        </svg>
+                                        @if($pendingPhotosCount > 0)
+                                            <span>Salin {{ $pendingPhotosCount }} Foto Baru ke Google Drive</span>
+                                        @else
+                                            <span>Periksa & Pulihkan Foto di Google Drive</span>
+                                        @endif
+                                    </button>
+                                </form>
+
+                                @if($pendingPhotosCount > 0 && $syncedPhotosCount > 0)
+                                    <form action="{{ route('admin.events.google-drive.sync', $event) }}" method="POST">
+                                        @csrf
+                                        <input type="hidden" name="force" value="1">
+                                        <button type="submit"
+                                                title="Periksa seluruh foto di Google Drive dan pulihkan jika ada foto lama yang terhapus"
+                                                class="px-3.5 py-2 bg-white hover:bg-wedding-linen border border-wedding-gold/30 text-wedding-dark text-xs font-semibold rounded-xl shadow-xs flex items-center space-x-1.5 transition-colors">
+                                            <span>Cek & Pulihkan Foto Terhapus</span>
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
 
                             @if($photos->total() > 0)
                                 <a href="{{ route('admin.events.download-zip', $event) }}" class="text-xs text-wedding-subtle hover:text-wedding-dark font-medium underline flex items-center space-x-1">
@@ -313,16 +327,18 @@
     var data = JSON.parse(e.postData.contents);
     var folder = DriveApp.getFolderById(data.folderId);
     
-    // Cegah duplikasi: jika file dengan nama sama sudah ada di folder, jangan buat ulang
+    // Cegah duplikasi: jika file dengan nama sama sudah ada dan TIDAK di tempat sampah (trash), jangan buat ulang
     var existingFiles = folder.getFilesByName(data.filename);
-    if (existingFiles.hasNext()) {
+    while (existingFiles.hasNext()) {
       var existing = existingFiles.next();
-      return ContentService.createTextOutput(JSON.stringify({
-        status: 'success',
-        id: existing.getId(),
-        name: existing.getName(),
-        already_exists: true
-      })).setMimeType(ContentService.MimeType.JSON);
+      if (!existing.isTrashed()) {
+        return ContentService.createTextOutput(JSON.stringify({
+          status: 'success',
+          id: existing.getId(),
+          name: existing.getName(),
+          already_exists: true
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
     }
 
     var decoded = Utilities.base64Decode(data.base64);
